@@ -17,11 +17,8 @@ interface Props {
   maxCount: number;
   primaryColor: string;
   datasetLabel?: string | null;
-  brands: string[];
-  selectedBrands: string[];
-  onToggleBrand: (brand: string) => void;
-  onSelectAllBrands: () => void;
-  onClearAllBrands: () => void;
+  clientDealershipCount: number;
+  competitorCount: number;
   clientDealerships: DealershipRow[];
   focusDealershipId: string | null;
   onFocusDealership: (id: string) => void;
@@ -29,15 +26,15 @@ interface Props {
   radiusOptions: readonly RadiusMiles[];
   onRadiusChange: (miles: RadiusMiles) => void;
   showZipLayer: boolean;
-  showDealershipLayer: boolean;
+  showClientDealershipLayer: boolean;
+  showCompetitorLayer: boolean;
   showRadiusLayer: boolean;
   onToggleZipLayer: (visible: boolean) => void;
-  onToggleDealershipLayer: (visible: boolean) => void;
+  onToggleClientDealershipLayer: (visible: boolean) => void;
+  onToggleCompetitorLayer: (visible: boolean) => void;
   onToggleRadiusLayer: (visible: boolean) => void;
-  dealershipCount: number;
   marketAnalysis: MarketAnalysis | null;
   hasFocusDealership: boolean;
-  competitorCount: number;
 }
 
 export function MapSidebar({
@@ -51,11 +48,8 @@ export function MapSidebar({
   maxCount,
   primaryColor,
   datasetLabel,
-  brands,
-  selectedBrands,
-  onToggleBrand,
-  onSelectAllBrands,
-  onClearAllBrands,
+  clientDealershipCount,
+  competitorCount,
   clientDealerships,
   focusDealershipId,
   onFocusDealership,
@@ -63,15 +57,15 @@ export function MapSidebar({
   radiusOptions,
   onRadiusChange,
   showZipLayer,
-  showDealershipLayer,
+  showClientDealershipLayer,
+  showCompetitorLayer,
   showRadiusLayer,
   onToggleZipLayer,
-  onToggleDealershipLayer,
+  onToggleClientDealershipLayer,
+  onToggleCompetitorLayer,
   onToggleRadiusLayer,
-  dealershipCount,
   marketAnalysis,
   hasFocusDealership,
-  competitorCount,
 }: Props) {
   const rgb = hexToRgb(primaryColor);
   const stops = legendStops(maxCount);
@@ -103,11 +97,23 @@ export function MapSidebar({
         <label className="flex items-center gap-2 text-xs text-[#2D3748] cursor-pointer">
           <input
             type="checkbox"
-            checked={showDealershipLayer}
-            onChange={e => onToggleDealershipLayer(e.target.checked)}
-            className="accent-[#4BA5A5]"
+            checked={showClientDealershipLayer}
+            onChange={e => onToggleClientDealershipLayer(e.target.checked)}
+            disabled={clientDealershipCount === 0}
+            className="accent-[#4BA5A5] disabled:opacity-40"
           />
-          Dealerships ({dealershipCount.toLocaleString('en-US')})
+          Client dealership{clientDealershipCount === 1 ? '' : 's'} (
+          {clientDealershipCount.toLocaleString('en-US')})
+        </label>
+        <label className="flex items-center gap-2 text-xs text-[#2D3748] cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showCompetitorLayer}
+            onChange={e => onToggleCompetitorLayer(e.target.checked)}
+            disabled={competitorCount === 0}
+            className="accent-[#4BA5A5] disabled:opacity-40"
+          />
+          Competitors ({competitorCount.toLocaleString('en-US')})
         </label>
         <label className="flex items-center gap-2 text-xs text-[#2D3748] cursor-pointer">
           <input
@@ -120,38 +126,6 @@ export function MapSidebar({
           Radius ring
         </label>
       </div>
-
-      {brands.length > 0 && (
-        <div className="px-5 py-4 border-b border-[#E2E8F0] space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-[#2D3748]">Brands</span>
-            <div className="flex gap-2 text-xs">
-              <button type="button" onClick={onSelectAllBrands} className="text-[#4BA5A5] hover:underline">
-                All
-              </button>
-              <button type="button" onClick={onClearAllBrands} className="text-[#718096] hover:underline">
-                None
-              </button>
-            </div>
-          </div>
-          <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
-            {brands.map(brand => (
-              <label
-                key={brand}
-                className="flex items-center gap-2 text-xs text-[#2D3748] cursor-pointer py-1"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedBrands.includes(brand)}
-                  onChange={() => onToggleBrand(brand)}
-                  className="accent-[#4BA5A5]"
-                />
-                <span>{brand}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
 
       {clientDealerships.length > 0 && (
         <div className="px-5 py-4 border-b border-[#E2E8F0] space-y-2">
@@ -170,7 +144,7 @@ export function MapSidebar({
             ))}
           </select>
           <p className="text-[10px] text-[#718096]">
-            Click a client pin on the map to focus. Radius is approximate (miles, not drive-time).
+            Radius rings center on this location (approximate miles, not drive-time).
           </p>
           <div className="flex gap-2 pt-1">
             {radiusOptions.map(miles => (

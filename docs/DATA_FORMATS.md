@@ -48,7 +48,18 @@ The importer unpivots wide → long automatically. Zero counts are skipped. Bull
 
 Sample files for local testing live in `fixtures/*.xlsx` (gitignored).
 
-## Dealership Upload
+## Dealership locations (MVP — revised June 2026)
+
+**Primary path:** no separate dealership file. After audience upload:
+
+1. System suggests client dealer name from the **audience filename** (e.g. `Hyundai Glendora April.xlsx`).
+2. User enters **dealer website** (Brittany: best way to pinpoint the store).
+3. User **confirms** the resolved location (human verification).
+4. User searches **competitors by brand + radius** via Google Places; reviews and saves selections.
+
+Optional fallback: upload a dealership spreadsheet (see below).
+
+## Dealership Upload (optional fallback)
 
 Supported file types:
 

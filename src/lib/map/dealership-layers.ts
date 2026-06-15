@@ -1,5 +1,6 @@
 import type { Feature, FeatureCollection, Point, Polygon } from 'geojson';
 import type maplibregl from 'maplibre-gl';
+import { clientDealerships, competitorDealerships } from '@/lib/dealership/filter';
 import type { DealershipRow } from '@/lib/dealership/types';
 import { circlePolygonCoordinates } from '@/lib/map/radius';
 
@@ -11,7 +12,15 @@ interface DealershipProperties {
   focused: boolean;
 }
 
-export function dealershipsToGeoJson(
+export const CLIENT_DEALERSHIP_SOURCE = 'client-dealerships';
+export const COMPETITOR_DEALERSHIP_SOURCE = 'competitor-dealerships';
+export const CLIENT_DEALERSHIP_LAYER = 'client-dealership-pins';
+export const COMPETITOR_DEALERSHIP_LAYER = 'competitor-dealership-pins';
+export const DEALERSHIP_PIN_LAYERS: string[] = [CLIENT_DEALERSHIP_LAYER, COMPETITOR_DEALERSHIP_LAYER];
+
+const LEGACY_DEALERSHIP_LAYER = 'dealership-pins';
+
+function dealershipsToGeoJson(
   dealers: DealershipRow[],
   focusDealershipId: string | null
 ): FeatureCollection<Point, DealershipProperties> {
@@ -58,7 +67,15 @@ export function radiusToGeoJson(
   };
 }
 
+function removeLegacyDealershipLayer(map: maplibregl.Map) {
+  if (map.getLayer(LEGACY_DEALERSHIP_LAYER)) {
+    map.removeLayer(LEGACY_DEALERSHIP_LAYER);
+  }
+}
+
 export function ensureDealershipLayers(map: maplibregl.Map, clientColor: string) {
+  removeLegacyDealershipLayer(map);
+
   if (!map.getSource('radius-areas')) {
     map.addSource('radius-areas', {
       type: 'geojson',
@@ -92,39 +109,44 @@ export function ensureDealershipLayers(map: maplibregl.Map, clientColor: string)
     });
   }
 
-  if (!map.getSource('dealerships')) {
-    map.addSource('dealerships', {
+  if (!map.getSource(CLIENT_DEALERSHIP_SOURCE)) {
+    map.addSource(CLIENT_DEALERSHIP_SOURCE, {
       type: 'geojson',
       data: { type: 'FeatureCollection', features: [] },
     });
   }
 
-  if (!map.getLayer('dealership-pins')) {
+  if (!map.getSource(COMPETITOR_DEALERSHIP_SOURCE)) {
+    map.addSource(COMPETITOR_DEALERSHIP_SOURCE, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    });
+  }
+
+  if (!map.getLayer(CLIENT_DEALERSHIP_LAYER)) {
     map.addLayer({
-      id: 'dealership-pins',
+      id: CLIENT_DEALERSHIP_LAYER,
       type: 'circle',
-      source: 'dealerships',
+      source: CLIENT_DEALERSHIP_SOURCE,
       paint: {
-        'circle-color': [
-          'case',
-          ['==', ['get', 'role'], 'client'],
-          clientColor,
-          '#64748B',
-        ],
-        'circle-radius': [
-          'case',
-          ['boolean', ['get', 'focused'], false],
-          11,
-          ['==', ['get', 'role'], 'client'],
-          8,
-          7,
-        ],
-        'circle-stroke-width': [
-          'case',
-          ['boolean', ['get', 'focused'], false],
-          3,
-          2,
-        ],
+        'circle-color': clientColor,
+        'circle-radius': ['case', ['boolean', ['get', 'focused'], false], 11, 8],
+        'circle-stroke-width': ['case', ['boolean', ['get', 'focused'], false], 3, 2],
+        'circle-stroke-color': '#FFFFFF',
+        'circle-opacity': 0.95,
+      },
+    });
+  }
+
+  if (!map.getLayer(COMPETITOR_DEALERSHIP_LAYER)) {
+    map.addLayer({
+      id: COMPETITOR_DEALERSHIP_LAYER,
+      type: 'circle',
+      source: COMPETITOR_DEALERSHIP_SOURCE,
+      paint: {
+        'circle-color': '#64748B',
+        'circle-radius': 7,
+        'circle-stroke-width': 2,
         'circle-stroke-color': '#FFFFFF',
         'circle-opacity': 0.95,
       },
@@ -153,8 +175,22 @@ export function updateDealershipSources(
     showRadius: boolean;
   }
 ) {
-  const dealerSource = map.getSource('dealerships') as maplibregl.GeoJSONSource | undefined;
-  dealerSource?.setData(dealershipsToGeoJson(options.dealers, options.focusDealershipId));
+  const clients = clientDealerships(options.dealers);
+  const focusClient =
+    clients.find(d => d.id === options.focusDealershipId) ?? clients[0] ?? null;
+  const competitors = competitorDealerships(options.dealers, focusClient);
+
+  const clientSource = map.getSource(CLIENT_DEALERSHIP_SOURCE) as
+    | maplibregl.GeoJSONSource
+    | undefined;
+  clientSource?.setData(
+    dealershipsToGeoJson(clients, options.focusDealershipId)
+  );
+
+  const competitorSource = map.getSource(COMPETITOR_DEALERSHIP_SOURCE) as
+    | maplibregl.GeoJSONSource
+    | undefined;
+  competitorSource?.setData(dealershipsToGeoJson(competitors, null));
 
   const radiusSource = map.getSource('radius-areas') as maplibregl.GeoJSONSource | undefined;
   if (!options.showRadius || !options.focusDealershipId) {
@@ -162,8 +198,8 @@ export function updateDealershipSources(
     return;
   }
 
-  const focus = options.dealers.find(d => d.id === options.focusDealershipId);
-  if (!focus || focus.latitude == null || focus.longitude == null) {
+  const focus = focusClient;
+  if (!focus?.latitude || !focus?.longitude) {
     radiusSource?.setData({ type: 'FeatureCollection', features: [] });
     return;
   }

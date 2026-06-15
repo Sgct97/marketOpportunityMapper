@@ -8,7 +8,10 @@ import {
 } from '@/lib/audience/aggregate';
 import type { AudienceZipRow } from '@/lib/audience/aggregate';
 import { computeMarketAnalysis } from '@/lib/audience/market-analysis';
-import { clientDealerships, filterDealerships, listDealershipBrands } from '@/lib/dealership/filter';
+import {
+  clientDealerships,
+  competitorDealerships,
+} from '@/lib/dealership/filter';
 import type { DealershipRow } from '@/lib/dealership/types';
 import { getBrand } from '@/lib/brands';
 import { fetchZipBoundaries } from '@/lib/map/boundaries';
@@ -72,31 +75,21 @@ export function MapWorkspace({
   const defaults = defaultMapSettings(resolveInitialFocus(dealerships, parsed));
 
   const audienceTypes = useMemo(() => listAudienceTypes(rows), [rows]);
-  const allBrands = useMemo(() => listDealershipBrands(dealerships), [dealerships]);
+  const clientOptions = useMemo(() => clientDealerships(dealerships), [dealerships]);
 
   const [selectedTypes, setSelectedTypes] = useState<string[]>(() => listAudienceTypes(rows));
-  const [selectedBrands, setSelectedBrands] = useState<string[]>(() =>
-    allBrands.length > 0 ? allBrands : []
-  );
   const [focusDealershipId, setFocusDealershipId] = useState<string | null>(
     () => defaults.focusDealershipId ?? null
   );
   const [radiusMiles, setRadiusMiles] = useState<RadiusMiles>(defaults.radiusMiles ?? 25);
   const [showZipLayer, setShowZipLayer] = useState(defaults.showZipLayer !== false);
-  const [showDealershipLayer, setShowDealershipLayer] = useState(
-    defaults.showDealershipLayer !== false
+  const [showClientDealershipLayer, setShowClientDealershipLayer] = useState(
+    parsed.showClientDealershipLayer !== false
+  );
+  const [showCompetitorLayer, setShowCompetitorLayer] = useState(
+    parsed.showCompetitorLayer !== false
   );
   const [showRadiusLayer, setShowRadiusLayer] = useState(defaults.showRadiusLayer !== false);
-
-  const visibleDealerships = useMemo(
-    () =>
-      selectedBrands.length > 0
-        ? filterDealerships(dealerships, { brands: selectedBrands })
-        : [],
-    [dealerships, selectedBrands]
-  );
-
-  const clientOptions = useMemo(() => clientDealerships(dealerships), [dealerships]);
 
   const aggregate = useMemo(
     () => aggregateAudienceByZip(rows, selectedTypes),
@@ -143,9 +136,14 @@ export function MapWorkspace({
     [clientOptions, focusDealershipId]
   );
 
-  const competitors = useMemo(
-    () => visibleDealerships.filter(d => d.role === 'competitor'),
-    [visibleDealerships]
+  const competitorOptions = useMemo(
+    () => competitorDealerships(dealerships, focusDealership),
+    [dealerships, focusDealership]
+  );
+
+  const competitorsForAnalysis = useMemo(
+    () => (showCompetitorLayer ? competitorOptions : []),
+    [showCompetitorLayer, competitorOptions]
   );
 
   const marketAnalysis = useMemo(() => {
@@ -163,14 +161,14 @@ export function MapWorkspace({
       focusLat: focusDealership.latitude,
       focusLng: focusDealership.longitude,
       radiusMiles,
-      competitors,
+      competitors: competitorsForAnalysis,
     });
   }, [
     aggregate.byZip,
     analysisCentroids,
     focusDealership,
     radiusMiles,
-    competitors,
+    competitorsForAnalysis,
     selectedTypes.length,
   ]);
 
@@ -187,10 +185,11 @@ export function MapWorkspace({
     );
   }
 
-  function toggleBrand(brandName: string) {
-    setSelectedBrands(prev =>
-      prev.includes(brandName) ? prev.filter(b => b !== brandName) : [...prev, brandName]
-    );
+  function persistLayerVisibility(client: boolean, competitor: boolean) {
+    persistSettings({
+      showClientDealershipLayer: client,
+      showCompetitorLayer: competitor,
+    });
   }
 
   function handleFocusDealership(id: string) {
@@ -207,12 +206,18 @@ export function MapWorkspace({
     <div className="flex flex-col h-screen bg-[#FAFBFC]">
       <header className="bg-white border-b border-[#E2E8F0] px-6 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4 min-w-0">
-          <Link
-            href={`/projects/${projectId}`}
-            className="text-sm text-[#4BA5A5] hover:underline shrink-0"
-          >
-            ← Setup
-          </Link>
+          <div className="flex items-center gap-3 shrink-0 text-sm">
+            <Link href="/" className="text-[#4BA5A5] hover:underline">
+              ← Projects
+            </Link>
+            <span className="text-[#CBD5E0]">|</span>
+            <Link
+              href={`/projects/${projectId}`}
+              className="text-[#4BA5A5] hover:underline"
+            >
+              Setup
+            </Link>
+          </div>
           <div className="min-w-0">
             <h1 className="text-base font-semibold text-[#1A202C] truncate">{projectName}</h1>
             <p className="text-xs text-[#718096]">Market opportunity map</p>
@@ -232,11 +237,12 @@ export function MapWorkspace({
           selectedTypes={selectedTypes}
           primaryColor={brand.primaryColor}
           typeLabel={typeLabel}
-          dealerships={visibleDealerships}
+          dealerships={dealerships}
           focusDealershipId={focusDealershipId}
           radiusMiles={radiusMiles}
           showZipLayer={showZipLayer}
-          showDealershipLayer={showDealershipLayer}
+          showClientDealershipLayer={showClientDealershipLayer}
+          showCompetitorLayer={showCompetitorLayer}
           showRadiusLayer={showRadiusLayer}
           onFocusDealership={handleFocusDealership}
         />
@@ -251,11 +257,8 @@ export function MapWorkspace({
           maxCount={aggregate.maxCount}
           primaryColor={brand.primaryColor}
           datasetLabel={datasetLabel}
-          brands={allBrands}
-          selectedBrands={selectedBrands}
-          onToggleBrand={toggleBrand}
-          onSelectAllBrands={() => setSelectedBrands([...allBrands])}
-          onClearAllBrands={() => setSelectedBrands([])}
+          clientDealershipCount={clientOptions.length}
+          competitorCount={competitorOptions.length}
           clientDealerships={clientOptions}
           focusDealershipId={focusDealershipId}
           onFocusDealership={handleFocusDealership}
@@ -263,24 +266,27 @@ export function MapWorkspace({
           radiusOptions={RADIUS_MILES_OPTIONS}
           onRadiusChange={handleRadiusChange}
           showZipLayer={showZipLayer}
-          showDealershipLayer={showDealershipLayer}
+          showClientDealershipLayer={showClientDealershipLayer}
+          showCompetitorLayer={showCompetitorLayer}
           showRadiusLayer={showRadiusLayer}
           onToggleZipLayer={v => {
             setShowZipLayer(v);
             persistSettings({ showZipLayer: v });
           }}
-          onToggleDealershipLayer={v => {
-            setShowDealershipLayer(v);
-            persistSettings({ showDealershipLayer: v });
+          onToggleClientDealershipLayer={v => {
+            setShowClientDealershipLayer(v);
+            persistLayerVisibility(v, showCompetitorLayer);
+          }}
+          onToggleCompetitorLayer={v => {
+            setShowCompetitorLayer(v);
+            persistLayerVisibility(showClientDealershipLayer, v);
           }}
           onToggleRadiusLayer={v => {
             setShowRadiusLayer(v);
             persistSettings({ showRadiusLayer: v });
           }}
-          dealershipCount={visibleDealerships.length}
           marketAnalysis={marketAnalysis}
           hasFocusDealership={Boolean(focusDealership?.latitude && focusDealership?.longitude)}
-          competitorCount={competitors.length}
         />
       </div>
     </div>

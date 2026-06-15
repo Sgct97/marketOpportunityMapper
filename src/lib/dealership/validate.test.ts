@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clientDealerships, filterDealerships, mappableDealerships } from './filter';
+import { clientDealerships, competitorDealerships, filterDealerships, isDuplicateOfClient, mappableDealerships } from './filter';
 import type { DealershipRow } from './types';
 import { validateDealershipRows } from './validate';
 
@@ -120,5 +120,22 @@ describe('filterDealerships', () => {
   it('lists mappable client dealers', () => {
     expect(mappableDealerships(rows)).toHaveLength(2);
     expect(clientDealerships(rows)).toHaveLength(1);
+    expect(competitorDealerships(rows)).toHaveLength(1);
+    expect(competitorDealerships(rows)[0]?.name).toBe('Comp Kia');
+  });
+
+  it('excludes client duplicate from competitor list', () => {
+    const client = clientDealerships(rows)[0]!;
+    const duplicateCompetitor = {
+      ...rows[1]!,
+      id: 'dup',
+      name: 'ABC Hyundai',
+      role: 'competitor' as const,
+      latitude: client.latitude,
+      longitude: client.longitude,
+    };
+    const all = [...rows, duplicateCompetitor];
+    expect(competitorDealerships(all, client)).toHaveLength(1);
+    expect(isDuplicateOfClient(duplicateCompetitor, client)).toBe(true);
   });
 });

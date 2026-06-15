@@ -39,8 +39,16 @@ const META_HEADERS = new Set([
 
 export function normalizeZip(raw: unknown): string | null {
   const s = String(raw ?? '').trim();
-  const match = s.match(/\d{5}/);
-  return match ? match[0] : null;
+  const fiveDigit = s.match(/\d{5}/);
+  if (fiveDigit) return fiveDigit[0];
+
+  // Excel often stores ZIPs as numbers, dropping leading zeros (e.g. 7081 → 07081).
+  const digitsOnly = s.replace(/\D/g, '');
+  if (digitsOnly.length >= 1 && digitsOnly.length <= 5) {
+    return digitsOnly.padStart(5, '0');
+  }
+
+  return null;
 }
 
 export function normalizeAudienceType(name: string): string {

@@ -12,6 +12,9 @@ import { choroplethFillPaint, choroplethLinePaint } from '@/lib/map/choropleth';
 import { hexToRgb } from '@/lib/map/colors';
 import { fetchZipBoundaries } from '@/lib/map/boundaries';
 import {
+  CLIENT_DEALERSHIP_LAYER,
+  COMPETITOR_DEALERSHIP_LAYER,
+  DEALERSHIP_PIN_LAYERS,
   ensureDealershipLayers,
   setLayerVisibility,
   updateDealershipSources,
@@ -31,7 +34,8 @@ interface Props {
   focusDealershipId: string | null;
   radiusMiles: RadiusMiles;
   showZipLayer: boolean;
-  showDealershipLayer: boolean;
+  showClientDealershipLayer: boolean;
+  showCompetitorLayer: boolean;
   showRadiusLayer: boolean;
   onFocusDealership: (id: string) => void;
 }
@@ -124,7 +128,8 @@ export function OpportunityMap({
   focusDealershipId,
   radiusMiles,
   showZipLayer,
-  showDealershipLayer,
+  showClientDealershipLayer,
+  showCompetitorLayer,
   showRadiusLayer,
   onFocusDealership,
 }: Props) {
@@ -219,16 +224,16 @@ export function OpportunityMap({
     if (dealerBoundRef.current) return;
     dealerBoundRef.current = true;
 
-    map.on('mouseenter', 'dealership-pins', () => {
+    map.on('mouseenter', DEALERSHIP_PIN_LAYERS, () => {
       map.getCanvas().style.cursor = 'pointer';
     });
 
-    map.on('mouseleave', 'dealership-pins', () => {
+    map.on('mouseleave', DEALERSHIP_PIN_LAYERS, () => {
       map.getCanvas().style.cursor = '';
       popupRef.current?.remove();
     });
 
-    map.on('click', 'dealership-pins', e => {
+    map.on('click', DEALERSHIP_PIN_LAYERS, e => {
       const feature = e.features?.[0];
       if (!feature?.properties) return;
       const id = String(feature.properties.id ?? '');
@@ -238,7 +243,7 @@ export function OpportunityMap({
       }
     });
 
-    map.on('mousemove', 'dealership-pins', e => {
+    map.on('mousemove', DEALERSHIP_PIN_LAYERS, e => {
       const feature = e.features?.[0];
       if (!feature?.properties) return;
       const props = feature.properties;
@@ -342,7 +347,8 @@ export function OpportunityMap({
     if (!map || !layersReady) return;
 
     setLayerVisibility(map, ['zip-fill', 'zip-outline'], showZipLayer);
-    setLayerVisibility(map, ['dealership-pins'], showDealershipLayer);
+    setLayerVisibility(map, [CLIENT_DEALERSHIP_LAYER], showClientDealershipLayer);
+    setLayerVisibility(map, [COMPETITOR_DEALERSHIP_LAYER], showCompetitorLayer);
     setLayerVisibility(map, ['radius-fill', 'radius-outline'], showRadiusLayer);
 
     updateDealershipSources(map, {
@@ -357,7 +363,8 @@ export function OpportunityMap({
     focusDealershipId,
     radiusMiles,
     showZipLayer,
-    showDealershipLayer,
+    showClientDealershipLayer,
+    showCompetitorLayer,
     showRadiusLayer,
   ]);
 
@@ -413,7 +420,16 @@ export function OpportunityMap({
         source?.setData(merged);
         setFeatureCount(merged.features.length);
 
-        if (merged.features.length > 0 && !focusDealershipId) {
+        if (merged.features.length === 0) {
+          setBoundaryError(
+            'No ZIP boundaries returned for this dataset. Census may be missing those ZIP codes.'
+          );
+          return;
+        }
+
+        setBoundaryError(null);
+
+        if (!focusDealershipId) {
           const bounds = new maplibregl.LngLatBounds();
           for (const feature of merged.features) {
             extendBoundsFromFeature(bounds, feature);
@@ -421,10 +437,6 @@ export function OpportunityMap({
           if (!bounds.isEmpty()) {
             mapInstance.fitBounds(bounds, { padding: 56, maxZoom: 12, duration: 900 });
           }
-        } else {
-          setBoundaryError(
-            'No ZIP boundaries returned for this dataset. Census may be missing those ZIP codes.'
-          );
         }
       })
       .catch(err => {

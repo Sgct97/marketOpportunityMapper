@@ -37,12 +37,16 @@ Source: client scope email (Brittany). Maps each ask to MVP, Phase 2 (~15h), or 
 
 | Client ask | Status | Notes |
 | --- | --- | --- |
-| Plot dealership pins | MVP | |
+| Plot dealership pins | MVP | Client via website lookup; competitors via Places search |
 | Client vs competitor | MVP | |
-| Filter/display by brand (uploaded data) | MVP | e.g. Hyundai + Nissan from file |
-| **Select brand → map pulls competitors** | **Phase 2 (~15h)** | Places/Mapbox API; committed estimate |
-| Centralize dealership we’re pitching | MVP | Focus dealership UX |
+| Filter/display by brand | MVP | |
+| **Select brand → map pulls competitors** | **MVP** | Places API + human review (was Phase 2) |
+| Centralize dealership we’re pitching | MVP | Website + confirm UI |
 | See audience vs competitor locations | MVP | Map + rings + summaries |
+
+## Client communication — dealership data
+
+**MVP inputs:** audience file + **client dealer website** (Brittany, June 2026). Filename suggests client name; website pinpoints the store when names are ambiguous. Separate dealership spreadsheet is optional fallback only.
 
 ## Competitive visualization
 
@@ -75,13 +79,11 @@ Source: client scope email (Brittany). Maps each ask to MVP, Phase 2 (~15h), or 
 | --- | --- |
 | 1. Upload audience file | MVP |
 | 2. System maps ZIPs | MVP |
-| 3. Enter/select dealerships | MVP (upload + geocode; focus on map) |
+| 3. Enter/select dealerships | MVP | Website lookup + confirm; competitor search + review |
 | 4. Visualize concentration | MVP |
 | 5. Toggle audience types | MVP |
 | 6. Present live | MVP |
 
 ## Client communication — competitor lookup
 
-**Promise to client:** automatic competitor lookup is **~15 additional hours** after core MVP, not included in the first delivery unless schedule is explicitly combined.
-
-**MVP alternative for pitches:** upload a competitor dealership file (or pre-built market list) until Phase 2 ships.
+**MVP (revised June 2026):** automatic competitor lookup by brand + radius is **in MVP**, with human review before saving pins. Brittany supplies audience files + dealer website; no separate dealer file required for typical pitches.
