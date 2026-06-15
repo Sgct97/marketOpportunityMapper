@@ -99,19 +99,13 @@ Recommended options:
 2. Use pre-simplified state/regional GeoJSON and load by viewport.
 3. Keep an API cap and surface clear UI language if limiting rendered ZIPs.
 
-## Hosting Recommendation
+## Hosting (decided)
 
-Recommended:
-
-- Vercel for Next.js app
-- Supabase for Postgres, file storage, and auth
-- MapLibre for map rendering
-- MapTiler/Stadia/Mapbox for hosted basemap tiles, or self-host later
-
-Alternative:
-
-- Render for app
-- Supabase/Neon + S3 for data/files
+- **Render** — Next.js app (same pattern as `lookerStudioDashboard`)
+- **Supabase** — Postgres, Auth, uploaded file storage
+- **DO Spaces** (or Supabase Storage) — PMTiles and static assets
+- **MapLibre** — map rendering
+- MapTiler/Stadia/Mapbox for basemap tiles (API key on Render)
 
 Avoid:
 

@@ -34,6 +34,20 @@ Validation rules:
 - Duplicate rows with same ZIP + Audience Type should be summed.
 - Invalid rows should be reported in an import summary.
 
+### Wide format (Brittany exports — Hyundai / Toyota)
+
+One row per ZIP; each **segment is its own column** (counts in cells).
+
+| Column | Required | Example |
+| --- | --- | --- |
+| ZIP or ZIPS | Yes | `90632` |
+| STATE, COUNTY, CITY, RADIUS | Ignored | metadata only |
+| Segment columns | Yes (1+) | `•Hispanic HYUNDAI Intenders`, `•Hispanic TOYOTA Owners`, etc. |
+
+The importer unpivots wide → long automatically. Zero counts are skipped. Bullet prefixes (`•`) on column names are stripped.
+
+Sample files for local testing live in `fixtures/*.xlsx` (gitignored).
+
 ## Dealership Upload
 
 Supported file types:

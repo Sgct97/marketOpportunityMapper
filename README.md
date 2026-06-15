@@ -1,58 +1,56 @@
 # Market Opportunity Mapper
 
-Standalone product plan for a sales-facing ZIP code opportunity mapping platform.
+Standalone platform for visualizing addressable market opportunity by ZIP code—built for sales pitches to automotive (and other) clients.
 
 ## Purpose
 
-Build an interactive mapping tool that lets the team upload standardized audience and dealership data, visualize addressable market opportunity by ZIP code, overlay client/competitor dealership locations, and export polished sales materials.
+Upload audience and dealership data, visualize opportunity on a ZIP boundary map, overlay client and competitor locations, tell a competitive story (radius, white-space highlights), and export branded PDFs.
 
-This is intentionally separate from the existing reporting dashboard. The current CTV ZIP map proves the visual concept, but this product needs project storage, uploads, dealership layers, reusable sales workflows, and export/reporting features.
+Separate from the internal `lookerStudioDashboard` reporting product. Reuses CTV ZIP and PDF patterns; adds projects, persistence, dealership workflow, and client-facing polish.
+
+## Development
+
+```bash
+npm install
+cp .env.example .env.local   # fill in Supabase keys
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Documentation
+
+| Doc | Description |
+| --- | --- |
+| [IMPLEMENTATION_CHECKLIST.md](./docs/IMPLEMENTATION_CHECKLIST.md) | **Build checklist** (checkboxes) |
+| [PROJECT_SPEC.md](./docs/PROJECT_SPEC.md) | Functional requirements and phasing |
+| [CLIENT_SCOPE.md](./docs/CLIENT_SCOPE.md) | Client email → MVP / Phase 2 traceability |
+| [DECISIONS.md](./docs/DECISIONS.md) | Stack, MVP vs Phase 2, **~15h competitor lookup** |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System design and map strategy |
+| [DATA_FORMATS.md](./docs/DATA_FORMATS.md) | Standardized upload columns |
+| [ROADMAP.md](./docs/ROADMAP.md) | Build milestones |
 
 ## Core MVP
 
-- Create and save projects
-- Upload standardized CSV/XLSX audience files
-- Upload standardized CSV/XLSX dealership files
-- Validate and normalize ZIP-level audience counts
-- Display ZIP boundary heatmap by audience count
-- Filter by audience type
-- Plot client and competitor dealerships
-- Filter dealerships by brand
-- Toggle map layers
-- Show radius rings around selected dealerships
-- Export screenshots/PDFs for proposals
+- Projects + historical uploads (CSV/XLSX, drag-and-drop)
+- ZIP boundary heatmap (MapLibre + vector tiles)
+- Audience type filters and tooltips
+- Dealership pins (client vs competitor), brand filter, **focus dealership**
+- Radius rings (10 / 25 / 50 mi), competitive summaries, white-space (MVP-lite)
+- Layer toggles, branded PDF export
+- Supabase (auth, DB, storage) + Render hosting
 
-## Optional Phase 2
+## Phase 2 — Competitor lookup (~15 hours)
 
-- Automatic competitor lookup by brand/location/radius using a location API
-- Deduplicate competitor results
-- Save selected competitors into projects
-- Allow manual corrections to API-sourced dealership results
+Committed estimate to client; scheduled after MVP sign-off. See [DECISIONS.md](./docs/DECISIONS.md).
 
-## Target Delivery
+## Stack
 
-Assuming build starts the week of May 18, 2026:
+- Next.js on Render
+- Supabase (Postgres, Auth, Storage)
+- MapLibre + PMTiles on DO Spaces
+- PDF export ported from `lookerStudioDashboard`
 
-- MVP target: June 6-9, 2026
-- Automatic competitor lookup target: June 13-18, 2026
+## Reference dashboard
 
-## Recommended Stack
-
-- App: Next.js
-- Database: Supabase Postgres or Neon Postgres
-- File storage: Supabase Storage or S3
-- Auth: Supabase Auth or Clerk
-- Map engine: MapLibre GL preferred; Leaflet acceptable for a lean MVP
-- ZIP boundaries: pre-optimized/vector-tile approach preferred
-- Upload parsing: CSV parser plus `xlsx`
-- Export: screenshot/PDF export similar to the existing dashboard pattern
-
-## Key Engineering Warning
-
-Do not load thousands of full ZIP polygons into memory in one request. The existing dashboard already hit Render memory issues with large ZIP polygon payloads. This new product should use one of:
-
-- Vector tiles
-- Pre-simplified ZIP boundary assets
-- Viewport-based polygon loading
-- Top-N/filtered polygon rendering with clear UI labels
-
+`/Users/spensercourville-taylor/htmlfiles/lookerStudioDashboard/dashboard`

@@ -1,52 +1,80 @@
 # Roadmap
 
-Assumption: uploads are standardized by Brittany/team.
+Assumption: uploads use standardized columns (see [DATA_FORMATS.md](./DATA_FORMATS.md)). Client scope email is the product north star; phasing below reflects delayed start (late May 2026).
 
-## Week 1: May 18-24 — Core Platform + Uploads
+## Delivery overview
 
-- Set up standalone app structure
-- Set up database/storage for projects and uploads
-- Build project create/save/load flow
-- Build standardized audience CSV/XLSX upload
-- Validate ZIP codes, audience types, and counts
-- Store historical uploads/projects
-- Add basic project dashboard/list view
+| Milestone | Scope | Estimate |
+| --- | --- | --- |
+| **MVP** | Full pitch workflow with uploaded audience + dealerships | ~4 weeks from build start |
+| **Phase 2** | Automatic competitor lookup by brand + radius | **~15 hours** (committed to client) |
+| **Phase 3+** | Drive-time, territory compare, share links | TBD |
 
-## Week 2: May 25-31 — ZIP Opportunity Map
+Original calendar targets (June 6–9 MVP) are superseded by actual start date; use milestone rows above for planning.
 
-- Build interactive ZIP boundary map
-- Map audience counts by ZIP
-- Add heatmap/color scaling by audience count
-- Add ZIP hover tooltips showing ZIP, audience type, and count
-- Add audience type filters
-- Add map layer controls
-- Optimize map performance for larger ZIP datasets
+---
 
-## Week 3: June 1-6 — Dealership Layer + Sales UI + MVP QA
+## MVP — Core platform + uploads (week 1)
 
-- Build standardized dealership CSV/XLSX upload
-- Plot client and competitor dealerships
-- Add different pin styles for client vs competitor
-- Add brand filters
-- Add radius rings around selected dealership
-- Add summary cards/top ZIPs
-- Clean up UI for sales presentation use
-- Add screenshot/PDF export for proposals
-- QA upload edge cases and map performance
+- Scaffold Next.js app; deploy to Render
+- Supabase: schema, RLS, Auth
+- Project create / rename / list / load
+- Audience CSV/XLSX upload (drag-and-drop)
+- Validate ZIP, audience type, count; import summary
+- Dataset versioning + set active version
+- Store originals in Supabase Storage
 
-## MVP Target: June 6-9
+## MVP — ZIP opportunity map (week 2)
 
-- Core standardized-upload platform ready for review/use
-- Final MVP tweaks from feedback handled in this window
+- Build/host ZCTA **PMTiles** (MapLibre); static asset on DO Spaces or Supabase Storage
+- Choropleth by audience count for selected type(s)
+- ZIP borders clearly visible; zoom/pan
+- Hover: ZIP, audience type, audience count
+- Audience type filter; layer toggle for ZIP heatmap
+- Census TIGER API fallback for edge ZIPs (port from CTV dashboard)
+- Performance: no full national GeoJSON per request on Render
 
-## Phase 2: Automatic Competitor Lookup — June 10-18
+## MVP — Dealerships + competitive story + export (week 3)
 
-- Add location/places API integration
-- Search dealerships by brand + market/radius
-- Deduplicate competitor results
-- Save selected competitors into projects
-- Allow manual corrections/edits
-- QA competitor lookup accuracy
+- Dealership CSV/XLSX upload; client vs competitor pins
+- Geocode rows missing lat/lng (on upload queue + import summary)
+- Brand filter; dealership layer toggle
+- **Focus client dealership** (center map, drive summaries)
+- Radius rings: 10 / 25 / 50 miles
+- Summary cards: total audience, top ZIPs, audience inside radius
+- **White-space (MVP-lite):** highlight/list high-audience ZIPs with no competitor within X mi
+- Presentation UI polish (live pitch: simple controls, layer toggles)
+- Branded PDF export (port `usePdfExport` / `PdfHeader` / `brands`)
+- QA: large files, bad ZIPs, geocode failures, map performance
 
-## Competitor Lookup Target: June 13-18
+## MVP sign-off
 
+- Client can run ideal workflow: upload audience → map → upload/select dealerships → toggle types → present → export PDF
+- Competitor **files** work in MVP; automatic API lookup does not
+
+---
+
+## Phase 2 — Automatic competitor lookup (~15 hours)
+
+Scheduled **immediately after MVP sign-off**. Fixed scope to stay within ~15h:
+
+1. Configure location API (Google Places or Mapbox) on Render
+2. Search competitors by **brand** + **radius** from **focused client dealership**
+3. Dedupe candidates (name + distance)
+4. Review UI: select results → save to project as competitor pins
+5. Manual edit/remove incorrect listings
+6. Smoke test on one real market
+
+**Not in the 15h block:** drive-time, territory scoring, public share URLs, bulk automation across many markets.
+
+See [DECISIONS.md](./DECISIONS.md) for hour breakdown and out-of-scope list.
+
+---
+
+## Phase 3+ (backlog)
+
+- Drive-time overlays
+- Territory comparisons
+- Expiring read-only presentation links
+- Advanced admin/roles
+- Non-standard column mapping UI
