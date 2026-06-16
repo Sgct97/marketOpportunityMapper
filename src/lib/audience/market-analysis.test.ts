@@ -86,5 +86,37 @@ describe('computeMarketAnalysis', () => {
     });
     expect(analysis.topZips[0]?.zip).toBe('90210');
     expect(analysis.audienceInRadius).toBeGreaterThan(0);
+    expect(analysis.marketTotal).toBe(1700);
+  });
+
+  it('scopes top ZIPs to the trade area instead of the whole market', () => {
+    // Tiny ring keeps only the focus ZIP; the larger 91786 must be excluded
+    // from the ranking so the sidebar story stays coherent.
+    const analysis = computeMarketAnalysis({
+      byZip: { '90210': 200, '91786': 1000, '90632': 50 },
+      zipCentroids: centroids,
+      focusLat: 34.09,
+      focusLng: -118.41,
+      radiusMiles: 3,
+      competitors: [],
+    });
+    expect(analysis.topZipsScope).toBe('trade-area');
+    expect(analysis.zipsInRadius).toBe(1);
+    expect(analysis.topZips.map(z => z.zip)).toEqual(['90210']);
+    expect(analysis.radiusShare).toBeCloseTo(200 / 1250, 5);
+  });
+
+  it('falls back to whole-market ranking when no centroids resolve', () => {
+    const analysis = computeMarketAnalysis({
+      byZip,
+      zipCentroids: {},
+      focusLat: 34.09,
+      focusLng: -118.41,
+      radiusMiles: 25,
+      competitors: [],
+    });
+    expect(analysis.topZipsScope).toBe('market');
+    expect(analysis.zipsInRadius).toBe(0);
+    expect(analysis.topZips[0]?.zip).toBe('90210');
   });
 });

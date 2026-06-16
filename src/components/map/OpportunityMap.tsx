@@ -38,6 +38,8 @@ interface Props {
   showCompetitorLayer: boolean;
   showRadiusLayer: boolean;
   onFocusDealership: (id: string) => void;
+  /** When false the map is hidden (e.g. dashboard view); resize on re-show. */
+  active?: boolean;
 }
 
 function ensureZipLayers(
@@ -132,6 +134,7 @@ export function OpportunityMap({
   showCompetitorLayer,
   showRadiusLayer,
   onFocusDealership,
+  active = true,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -370,6 +373,14 @@ export function OpportunityMap({
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || !layersReady || !active) return;
+    // Container had zero size while hidden (dashboard view); recompute on show.
+    const raf = requestAnimationFrame(() => map.resize());
+    return () => cancelAnimationFrame(raf);
+  }, [active, layersReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map || !layersReady || !focusDealershipId) return;
 
     const focus = dealerships.find(d => d.id === focusDealershipId);
@@ -465,12 +476,12 @@ export function OpportunityMap({
   ]);
 
   return (
-    <div className="relative flex-1 min-h-[400px] w-full bg-[#F1F5F9] mom-map-shell">
+    <div className="relative flex-1 min-h-[400px] w-full bg-[#070b15] mom-map-shell">
       <div ref={containerRef} className="absolute inset-0 w-full h-full" />
 
       {!layersReady && !mapError && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-[#F8FAFC]">
-          <p className="text-sm text-[#64748B] tracking-wide">Loading map…</p>
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-[#070b15]">
+          <p className="text-sm text-[var(--muted)] tracking-wide">Loading map…</p>
         </div>
       )}
 
@@ -481,23 +492,23 @@ export function OpportunityMap({
       )}
 
       {mapError && (
-        <div className="absolute top-4 left-4 right-4 z-10 max-w-md bg-[#FFF5F5] border border-[#FECACA] px-4 py-2.5 text-xs text-[#B91C1C] shadow-sm">
+        <div className="absolute top-4 left-4 right-4 z-10 max-w-md rounded-lg bg-[rgba(60,15,20,0.85)] border border-[rgba(255,120,120,0.35)] px-4 py-2.5 text-xs text-[#FCA5A5] backdrop-blur-md">
           {mapError}
         </div>
       )}
 
       {boundaryError && (
-        <div className="absolute top-14 left-4 right-4 z-10 max-w-md bg-[#FFF5F5] border border-[#FECACA] px-4 py-2.5 text-xs text-[#B91C1C] shadow-sm">
+        <div className="absolute top-14 left-4 right-4 z-10 max-w-md rounded-lg bg-[rgba(60,15,20,0.85)] border border-[rgba(255,120,120,0.35)] px-4 py-2.5 text-xs text-[#FCA5A5] backdrop-blur-md">
           {boundaryError}
         </div>
       )}
 
       {layersReady && !boundaryLoading && displayedFeatureCount > 0 && (
         <div className="mom-map-chip absolute bottom-5 left-5 z-10">
-          <span className="font-medium text-[#334155]">
+          <span className="font-semibold text-[var(--ink)] tnum">
             {displayedFeatureCount.toLocaleString('en-US')}
           </span>
-          <span className="text-[#64748B]">
+          <span className="text-[var(--muted)]">
             {' '}
             ZIP{displayedFeatureCount === 1 ? '' : 's'} in market area
           </span>
@@ -505,8 +516,8 @@ export function OpportunityMap({
       )}
 
       {isEmptySelection && selectedTypes.length === 0 && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#F8FAFC]/80 backdrop-blur-[1px] pointer-events-none">
-          <p className="text-sm text-[#64748B]">Select at least one audience segment</p>
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#070b15]/80 backdrop-blur-[2px] pointer-events-none">
+          <p className="text-sm text-[var(--muted)]">Select at least one audience segment</p>
         </div>
       )}
     </div>

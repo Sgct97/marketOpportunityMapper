@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   confirmClientDealer,
   lookupClientDealer,
@@ -40,9 +40,13 @@ export function ClientDealerSetup({
   const [preferredId, setPreferredId] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(confirmedClient);
 
-  useEffect(() => {
+  // Re-sync when the server sends a new confirmed client (e.g. after refresh).
+  // Adjusting state during render avoids the cascading-effect anti-pattern.
+  const [prevConfirmedClient, setPrevConfirmedClient] = useState(confirmedClient);
+  if (confirmedClient !== prevConfirmedClient) {
+    setPrevConfirmedClient(confirmedClient);
     setConfirmed(confirmedClient);
-  }, [confirmedClient]);
+  }
 
   async function handleLookup() {
     setPending(true);

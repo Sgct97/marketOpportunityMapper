@@ -90,7 +90,7 @@ export function ensureDealershipLayers(map: maplibregl.Map, clientColor: string)
       source: 'radius-areas',
       paint: {
         'fill-color': clientColor,
-        'fill-opacity': 0.06,
+        'fill-opacity': 0.09,
       },
     });
   }
@@ -144,10 +144,10 @@ export function ensureDealershipLayers(map: maplibregl.Map, clientColor: string)
       type: 'circle',
       source: COMPETITOR_DEALERSHIP_SOURCE,
       paint: {
-        'circle-color': '#64748B',
+        'circle-color': '#9FB1C9',
         'circle-radius': 7,
         'circle-stroke-width': 2,
-        'circle-stroke-color': '#FFFFFF',
+        'circle-stroke-color': 'rgba(7,11,21,0.9)',
         'circle-opacity': 0.95,
       },
     });

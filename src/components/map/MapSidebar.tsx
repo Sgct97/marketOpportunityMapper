@@ -5,6 +5,7 @@ import type { MarketAnalysis } from '@/lib/audience/market-analysis';
 import type { DealershipRow } from '@/lib/dealership/types';
 import type { RadiusMiles } from '@/lib/projects/settings';
 import { fillColor, hexToRgb } from '@/lib/map/colors';
+import { formatNumber, formatPercent } from '@/lib/format';
 
 interface Props {
   audienceTypes: string[];
@@ -35,6 +36,39 @@ interface Props {
   onToggleRadiusLayer: (visible: boolean) => void;
   marketAnalysis: MarketAnalysis | null;
   hasFocusDealership: boolean;
+}
+
+function Switch({
+  label,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: React.ReactNode;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label
+      className={`flex items-center justify-between gap-3 py-1.5 ${
+        disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
+      }`}
+    >
+      <span className="text-[13px] leading-snug text-[var(--ink-2)]">{label}</span>
+      <span className="relative inline-flex h-5 w-9 shrink-0 items-center">
+        <input
+          type="checkbox"
+          className="peer sr-only"
+          checked={checked}
+          disabled={disabled}
+          onChange={e => onChange(e.target.checked)}
+        />
+        <span className="absolute inset-0 rounded-full bg-[var(--line)] transition-colors peer-checked:bg-[var(--accent)]" />
+        <span className="absolute left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
+      </span>
+    </label>
+  );
 }
 
 export function MapSidebar({
@@ -69,73 +103,56 @@ export function MapSidebar({
 }: Props) {
   const rgb = hexToRgb(primaryColor);
   const stops = legendStops(maxCount);
+  const scoped = marketAnalysis?.topZipsScope === 'trade-area';
 
   return (
-    <aside className="w-full lg:w-80 shrink-0 bg-white border-l border-[#E2E8F0] flex flex-col max-h-[50vh] lg:max-h-none lg:h-full overflow-y-auto">
-      <div className="px-5 py-4 border-b border-[#E2E8F0]">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-[#4BA5A5]">
-          Map controls
-        </h2>
+    <aside
+      className="mom-scroll w-full lg:w-[372px] shrink-0 border-l border-[var(--line)] flex flex-col max-h-[52vh] lg:max-h-none lg:h-full overflow-y-auto backdrop-blur-xl"
+      style={{ background: 'linear-gradient(180deg, rgba(12,18,32,0.78), rgba(7,11,21,0.86))' }}
+    >
+      <div className="px-6 pt-5 pb-4 border-b border-[var(--line-soft)]">
+        <h2 className="mom-eyebrow">Map controls</h2>
         {datasetLabel && (
-          <p className="text-xs text-[#718096] mt-1 truncate" title={datasetLabel}>
-            Audience: {datasetLabel}
+          <p className="mt-1.5 text-[12px] text-[var(--muted)] truncate" title={datasetLabel}>
+            {datasetLabel}
           </p>
         )}
       </div>
 
-      <div className="px-5 py-4 border-b border-[#E2E8F0] space-y-3">
-        <p className="text-xs font-medium text-[#718096] uppercase tracking-wide">Layers</p>
-        <label className="flex items-center gap-2 text-xs text-[#2D3748] cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showZipLayer}
-            onChange={e => onToggleZipLayer(e.target.checked)}
-            className="accent-[#4BA5A5]"
-          />
-          ZIP audience heatmap
-        </label>
-        <label className="flex items-center gap-2 text-xs text-[#2D3748] cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showClientDealershipLayer}
-            onChange={e => onToggleClientDealershipLayer(e.target.checked)}
-            disabled={clientDealershipCount === 0}
-            className="accent-[#4BA5A5] disabled:opacity-40"
-          />
-          Client dealership{clientDealershipCount === 1 ? '' : 's'} (
-          {clientDealershipCount.toLocaleString('en-US')})
-        </label>
-        <label className="flex items-center gap-2 text-xs text-[#2D3748] cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showCompetitorLayer}
-            onChange={e => onToggleCompetitorLayer(e.target.checked)}
-            disabled={competitorCount === 0}
-            className="accent-[#4BA5A5] disabled:opacity-40"
-          />
-          Competitors ({competitorCount.toLocaleString('en-US')})
-        </label>
-        <label className="flex items-center gap-2 text-xs text-[#2D3748] cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showRadiusLayer}
-            onChange={e => onToggleRadiusLayer(e.target.checked)}
-            disabled={!focusDealershipId}
-            className="accent-[#4BA5A5] disabled:opacity-40"
-          />
-          Radius ring
-        </label>
+      <div className="px-6 py-4 border-b border-[var(--line-soft)]">
+        <p className="mom-eyebrow mb-1.5">Layers</p>
+        <Switch label="ZIP audience heatmap" checked={showZipLayer} onChange={onToggleZipLayer} />
+        <Switch
+          label={`Client dealership${clientDealershipCount === 1 ? '' : 's'} (${formatNumber(
+            clientDealershipCount
+          )})`}
+          checked={showClientDealershipLayer}
+          disabled={clientDealershipCount === 0}
+          onChange={onToggleClientDealershipLayer}
+        />
+        <Switch
+          label={`Competitors (${formatNumber(competitorCount)})`}
+          checked={showCompetitorLayer}
+          disabled={competitorCount === 0}
+          onChange={onToggleCompetitorLayer}
+        />
+        <Switch
+          label="Radius ring"
+          checked={showRadiusLayer}
+          disabled={!focusDealershipId}
+          onChange={onToggleRadiusLayer}
+        />
       </div>
 
       {clientDealerships.length > 0 && (
-        <div className="px-5 py-4 border-b border-[#E2E8F0] space-y-2">
-          <label className="block text-sm font-medium text-[#2D3748]">
-            Focus client dealership
+        <div className="px-6 py-4 border-b border-[var(--line-soft)] space-y-2.5">
+          <label className="block text-[13px] font-semibold text-[var(--ink)]">
+            Focus dealership
           </label>
           <select
             value={focusDealershipId ?? ''}
             onChange={e => onFocusDealership(e.target.value)}
-            className="w-full border border-[#E2E8F0] px-2 py-2 text-xs text-[#2D3748] bg-white focus:outline-none focus:border-[#4BA5A5]"
+            className="w-full rounded-lg border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-[13px] text-[var(--ink)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
           >
             {clientDealerships.map(d => (
               <option key={d.id} value={d.id}>
@@ -143,110 +160,106 @@ export function MapSidebar({
               </option>
             ))}
           </select>
-          <p className="text-[10px] text-[#718096]">
-            Radius rings center on this location (approximate miles, not drive-time).
-          </p>
-          <div className="flex gap-2 pt-1">
+          <div className="flex gap-2 pt-0.5">
             {radiusOptions.map(miles => (
               <button
                 key={miles}
                 type="button"
                 onClick={() => onRadiusChange(miles)}
-                className={`flex-1 py-1.5 text-xs border transition-colors ${
-                  radiusMiles === miles
-                    ? 'border-[#4BA5A5] bg-[#4BA5A5]/10 text-[#2D3748] font-medium'
-                    : 'border-[#E2E8F0] text-[#718096] hover:border-[#CBD5E0]'
-                }`}
+                data-active={radiusMiles === miles}
+                className="flex-1 rounded-lg border py-2 text-[13px] font-semibold transition-colors data-[active=true]:border-[var(--accent)] data-[active=true]:bg-[var(--accent-soft)] data-[active=true]:text-[var(--ink)] border-[var(--line)] text-[var(--muted)] hover:border-[var(--faint)]"
               >
                 {miles} mi
               </button>
             ))}
           </div>
+          <p className="text-[11px] text-[var(--faint)]">
+            Straight-line radius from the client pin (not drive-time).
+          </p>
         </div>
       )}
 
-      <div className="px-5 py-4 border-b border-[#E2E8F0] space-y-2">
+      <div className="px-6 py-4 border-b border-[var(--line-soft)] space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-[#2D3748]">Audience segments</span>
-          <div className="flex gap-2 text-xs">
-            <button type="button" onClick={onSelectAll} className="text-[#4BA5A5] hover:underline">
+          <span className="text-[13px] font-semibold text-[var(--ink)]">Audience segments</span>
+          <div className="flex gap-3 text-[12px] font-medium">
+            <button type="button" onClick={onSelectAll} className="text-[var(--accent)] hover:underline">
               All
             </button>
-            <button type="button" onClick={onClearAll} className="text-[#718096] hover:underline">
+            <button type="button" onClick={onClearAll} className="text-[var(--muted)] hover:underline">
               None
             </button>
           </div>
         </div>
-        <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
-          {audienceTypes.map(type => (
-            <label
-              key={type}
-              className="flex items-start gap-2 text-xs text-[#2D3748] cursor-pointer py-1"
-            >
-              <input
-                type="checkbox"
-                checked={selectedTypes.includes(type)}
-                onChange={() => onToggleType(type)}
-                className="mt-0.5 accent-[#4BA5A5]"
-              />
-              <span className="leading-snug">{type}</span>
-            </label>
-          ))}
+        <p className="text-[11px] text-[var(--faint)] -mt-1">
+          Filters the map. The dashboard always shows every segment.
+        </p>
+        <div className="mom-scroll max-h-44 overflow-y-auto space-y-0.5 pr-1">
+          {audienceTypes.map(type => {
+            const checked = selectedTypes.includes(type);
+            return (
+              <label
+                key={type}
+                className="flex items-start gap-2.5 rounded-md px-1 py-1.5 text-[12.5px] leading-snug text-[var(--ink-2)] cursor-pointer hover:bg-[var(--surface-2)]"
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => onToggleType(type)}
+                  className="mt-0.5 h-3.5 w-3.5 accent-[var(--accent)]"
+                />
+                <span>{type}</span>
+              </label>
+            );
+          })}
         </div>
       </div>
 
-      <div className="px-5 py-4 border-b border-[#E2E8F0]">
-        <p className="text-xs font-medium text-[#718096] uppercase tracking-wide mb-2">Summary</p>
-        <dl className="space-y-1 text-sm text-[#2D3748]">
-          <div className="flex justify-between">
-            <dt className="text-[#718096]">Total audience</dt>
-            <dd className="font-medium tabular-nums">{totalAudience.toLocaleString('en-US')}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-[#718096]">ZIPs on map</dt>
-            <dd className="font-medium tabular-nums">{zipCount.toLocaleString('en-US')}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-[#718096]">Segments</dt>
-            <dd className="font-medium tabular-nums">{selectedTypes.length}</dd>
-          </div>
+      <div className="px-6 py-4 border-b border-[var(--line-soft)]">
+        <p className="mom-eyebrow mb-2.5">Selected on map</p>
+        <dl className="grid grid-cols-2 gap-3">
+          <Metric label="Audience" value={formatNumber(totalAudience)} />
+          <Metric label="ZIPs" value={formatNumber(zipCount)} />
+          <Metric label="Segments" value={`${selectedTypes.length}/${audienceTypes.length}`} />
+          <Metric label="Peak ZIP" value={formatNumber(maxCount)} />
         </dl>
       </div>
 
       {hasFocusDealership && marketAnalysis && selectedTypes.length > 0 && (
-        <div className="px-5 py-4 border-b border-[#E2E8F0] space-y-3">
-          <p className="text-xs font-medium text-[#718096] uppercase tracking-wide">
-            Market opportunity
-          </p>
+        <div className="px-6 py-4 border-b border-[var(--line-soft)] space-y-3.5">
+          <p className="mom-eyebrow">Trade area · {radiusMiles} mi</p>
 
-          <div className="rounded-sm border border-[#E2E8F0] bg-[#F8FAFC] px-3 py-2.5">
-            <p className="text-[10px] uppercase tracking-wide text-[#718096]">
+          <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3">
+            <p className="text-[11px] uppercase tracking-wide text-[var(--faint)]">
               Audience within {radiusMiles} mi
             </p>
-            <p className="text-lg font-semibold tabular-nums text-[#1A202C] mt-0.5">
-              {marketAnalysis.audienceInRadius.toLocaleString('en-US')}
+            <p className="mom-stat text-[26px] font-semibold mt-1">
+              {formatNumber(marketAnalysis.audienceInRadius)}
             </p>
-            <p className="text-[10px] text-[#718096] mt-1">
-              {marketAnalysis.zipsInRadius} ZIP{marketAnalysis.zipsInRadius === 1 ? '' : 's'} ·
-              ZIP-centroid estimate (not drive-time)
+            <p className="text-[11px] text-[var(--muted)] mt-1.5">
+              {formatNumber(marketAnalysis.zipsInRadius)} ZIP
+              {marketAnalysis.zipsInRadius === 1 ? '' : 's'}
+              {marketAnalysis.marketTotal > 0 && (
+                <> · {formatPercent(marketAnalysis.radiusShare)} of total market</>
+              )}
             </p>
           </div>
 
           {marketAnalysis.topZips.length > 0 && (
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-wide text-[#718096] mb-1.5">
-                Top ZIPs
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--faint)] mb-2">
+                Top ZIPs {scoped ? 'in trade area' : 'in market'}
               </p>
-              <ul className="space-y-1">
+              <ul className="space-y-1.5">
                 {marketAnalysis.topZips.map((z, i) => (
-                  <li
-                    key={z.zip}
-                    className="flex justify-between text-xs text-[#2D3748] tabular-nums"
-                  >
-                    <span className="text-[#718096]">
-                      {i + 1}. {z.zip}
+                  <li key={z.zip} className="flex items-center justify-between text-[13px]">
+                    <span className="text-[var(--muted)] tnum">
+                      <span className="inline-block w-5 text-[var(--faint)]">{i + 1}</span>
+                      {z.zip}
                     </span>
-                    <span className="font-medium">{z.count.toLocaleString('en-US')}</span>
+                    <span className="font-semibold text-[var(--ink)] tnum">
+                      {formatNumber(z.count)}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -254,21 +267,22 @@ export function MapSidebar({
           )}
 
           {marketAnalysis.whiteSpace.length > 0 && (
-            <div>
-              <p className="text-[10px] font-medium uppercase tracking-wide text-[#718096] mb-1.5">
+            <div className="rounded-xl border border-[var(--line)] px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--faint)]">
                 White space
               </p>
-              <p className="text-[10px] text-[#718096] mb-1.5">
-                High-audience ZIPs with no competitor within {radiusMiles} mi
+              <p className="text-[11px] text-[var(--muted)] mt-0.5 mb-2">
+                High audience, no competitor within {radiusMiles} mi
               </p>
-              <ul className="space-y-1">
+              <ul className="space-y-1.5">
                 {marketAnalysis.whiteSpace.map(z => (
-                  <li
-                    key={z.zip}
-                    className="flex justify-between text-xs text-[#2D3748] tabular-nums"
-                  >
-                    <span style={{ color: primaryColor }}>{z.zip}</span>
-                    <span className="font-medium">{z.count.toLocaleString('en-US')}</span>
+                  <li key={z.zip} className="flex items-center justify-between text-[13px]">
+                    <span className="font-medium tnum" style={{ color: 'var(--accent)' }}>
+                      {z.zip}
+                    </span>
+                    <span className="font-semibold text-[var(--ink)] tnum">
+                      {formatNumber(z.count)}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -276,46 +290,58 @@ export function MapSidebar({
           )}
 
           {marketAnalysis.whiteSpace.length === 0 && competitorCount === 0 && (
-            <p className="text-[10px] text-[#718096]">
-              Upload competitor dealerships to identify white-space ZIPs.
+            <p className="text-[11px] text-[var(--muted)]">
+              Add competitor dealerships to surface white-space ZIPs.
             </p>
           )}
         </div>
       )}
 
       {!hasFocusDealership && selectedTypes.length > 0 && (
-        <div className="px-5 py-3 border-b border-[#E2E8F0] text-[10px] text-[#718096]">
-          Upload a client dealership with coordinates to see radius audience and white-space
-          analysis.
+        <div className="px-6 py-3.5 border-b border-[var(--line-soft)] text-[11px] text-[var(--muted)]">
+          Confirm a client dealership to unlock radius and white-space analysis.
         </div>
       )}
 
-      <div className="px-5 py-4">
-        <p className="text-xs font-medium text-[#718096] uppercase tracking-wide mb-3">
-          Audience intensity
-        </p>
+      <div className="px-6 py-5 mt-auto">
+        <p className="mom-eyebrow mb-3">Audience intensity</p>
         <div
-          className="h-2 w-full border border-[#E2E8F0] mb-2"
+          className="h-2.5 w-full rounded-full border border-[var(--line)]"
           style={{
-            background: `linear-gradient(90deg, ${fillColor(rgb, 0)} 0%, ${fillColor(rgb, 0.5)} 50%, ${fillColor(rgb, 1)} 100%)`,
+            background: `linear-gradient(90deg, ${fillColor(rgb, 0.08)} 0%, ${fillColor(
+              rgb,
+              0.5
+            )} 50%, ${fillColor(rgb, 1)} 100%)`,
           }}
           aria-hidden
         />
-        <div className="flex justify-between text-[10px] text-[#718096] tabular-nums">
+        <div className="mt-1.5 flex justify-between text-[11px] text-[var(--faint)] tnum">
           <span>{stops[0]?.label ?? '0'}</span>
           <span>{stops[stops.length - 1]?.label ?? '—'}</span>
         </div>
-        <div className="mt-4 flex gap-3 text-[10px] text-[#718096]">
-          <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: primaryColor }} />
+        <div className="mt-4 flex gap-4 text-[11px] text-[var(--muted)]">
+          <span className="flex items-center gap-1.5">
+            <span
+              className="w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm"
+              style={{ backgroundColor: 'var(--accent)' }}
+            />
             Client
           </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#64748B] border-2 border-white shadow-sm" />
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#9FB1C9] border border-[rgba(7,11,21,0.9)] shadow-sm" />
             Competitor
           </span>
         </div>
       </div>
     </aside>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[11px] text-[var(--faint)]">{label}</dt>
+      <dd className="mom-stat text-[19px] font-semibold mt-0.5">{value}</dd>
+    </div>
   );
 }

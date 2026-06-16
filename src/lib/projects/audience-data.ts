@@ -39,10 +39,7 @@ export async function loadProjectAudience(projectId: string): Promise<ProjectAud
     };
   }
 
-  const { data: counts } = await supabase
-    .from('audience_zip_counts')
-    .select('zip, audience_type, audience_count')
-    .eq('dataset_id', dataset.id);
+  const rows = await loadAllZipCounts(supabase, dataset.id);
 
   return {
     projectId: project.id,
@@ -50,10 +47,44 @@ export async function loadProjectAudience(projectId: string): Promise<ProjectAud
     brandId: project.brand_id,
     datasetId: dataset.id,
     datasetLabel: dataset.label,
-    rows: (counts ?? []).map(r => ({
-      zip: r.zip,
-      audience_type: r.audience_type,
-      audience_count: r.audience_count,
-    })),
+    rows,
   };
+}
+
+/**
+ * Supabase caps a single select at ~1,000 rows. Wide-format audience files
+ * easily exceed that (ZIPs × segments), so we page through the full dataset —
+ * otherwise totals silently undercount the market.
+ */
+const ZIP_COUNTS_PAGE_SIZE = 1000;
+
+async function loadAllZipCounts(
+  supabase: Awaited<ReturnType<typeof createDataClient>>,
+  datasetId: string
+): Promise<AudienceZipRow[]> {
+  const rows: AudienceZipRow[] = [];
+
+  for (let from = 0; ; from += ZIP_COUNTS_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('audience_zip_counts')
+      .select('zip, audience_type, audience_count')
+      .eq('dataset_id', datasetId)
+      .order('zip', { ascending: true })
+      .order('audience_type', { ascending: true })
+      .range(from, from + ZIP_COUNTS_PAGE_SIZE - 1);
+
+    if (error || !data || data.length === 0) break;
+
+    for (const r of data) {
+      rows.push({
+        zip: r.zip,
+        audience_type: r.audience_type,
+        audience_count: r.audience_count,
+      });
+    }
+
+    if (data.length < ZIP_COUNTS_PAGE_SIZE) break;
+  }
+
+  return rows;
 }

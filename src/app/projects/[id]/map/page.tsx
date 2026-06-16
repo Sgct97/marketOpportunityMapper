@@ -4,7 +4,7 @@ import { loadProjectAudience } from '@/lib/projects/audience-data';
 import { loadProjectDealerships } from '@/lib/projects/dealership-data';
 import { parseProjectMapSettings } from '@/lib/projects/settings';
 import { createDataClient } from '@/lib/supabase/data';
-import { MapWorkspace } from '@/components/map/MapWorkspace';
+import { PresentationWorkspace } from '@/components/presentation/PresentationWorkspace';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -47,7 +47,7 @@ export default async function ProjectMapPage({ params }: Props) {
   const dealershipPayload = await loadProjectDealerships(id);
 
   return (
-    <MapWorkspace
+    <PresentationWorkspace
       projectId={payload.projectId}
       projectName={payload.projectName}
       brandId={payload.brandId}
