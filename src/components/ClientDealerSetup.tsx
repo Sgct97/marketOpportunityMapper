@@ -95,10 +95,10 @@ export function ClientDealerSetup({
   }
 
   return (
-    <div className="bg-white border border-[#E2E8F0] p-6 space-y-4">
+    <div className="mom-card p-6 space-y-4">
       <div>
-        <h3 className="text-sm font-medium text-[#2D3748]">Client dealership</h3>
-        <p className="text-xs text-[#718096] mt-1">
+        <h3 className="text-sm font-semibold text-[var(--ink)]">Client dealership</h3>
+        <p className="text-xs text-[var(--muted)] mt-1.5">
           Suggested from your audience file name
           {audienceFileName ? ` (${audienceFileName})` : ''}. Look up by name, or add the dealer
           website to pinpoint the store when names are ambiguous. Confirm before competitor search.
@@ -106,8 +106,8 @@ export function ClientDealerSetup({
       </div>
 
       {confirmed ? (
-        <div className="border border-[#9AE6B4] bg-[#F0FFF4] px-4 py-3 text-sm text-[#22543D] space-y-1">
-          <p className="font-medium">Confirmed client: {confirmed.name}</p>
+        <div className="mom-success px-4 py-3 text-sm space-y-1">
+          <p className="font-semibold">Confirmed client: {confirmed.name}</p>
           <p className="text-xs">{confirmed.brand}</p>
           {confirmed.address && <p className="text-xs">{confirmed.address}</p>}
           <button
@@ -116,40 +116,40 @@ export function ClientDealerSetup({
               setConfirmed(null);
               setMatches([]);
             }}
-            className="text-xs text-[#4BA5A5] hover:underline mt-2"
+            className="mom-link text-xs mt-2"
           >
             Change dealership
           </button>
         </div>
       ) : (
         <>
-          <label className="block text-xs text-[#2D3748]">
-            <span className="font-medium">Dealer name</span>
+          <label className="block text-xs text-[var(--ink-2)]">
+            <span className="font-semibold">Dealer name</span>
             <input
               value={name}
               onChange={e => setName(e.target.value)}
-              className="mt-1 w-full border border-[#E2E8F0] px-3 py-2 text-sm focus:outline-none focus:border-[#4BA5A5]"
+              className="mom-field mt-1.5 text-sm"
               placeholder="Hyundai of Glendora"
             />
           </label>
 
-          <label className="block text-xs text-[#2D3748]">
-            <span className="font-medium">Brand</span>
+          <label className="block text-xs text-[var(--ink-2)]">
+            <span className="font-semibold">Brand</span>
             <input
               value={brand}
               onChange={e => setBrand(e.target.value)}
-              className="mt-1 w-full border border-[#E2E8F0] px-3 py-2 text-sm focus:outline-none focus:border-[#4BA5A5]"
+              className="mom-field mt-1.5 text-sm"
               placeholder="Hyundai"
             />
           </label>
 
-          <label className="block text-xs text-[#2D3748]">
-            <span className="font-medium">Dealer website (optional)</span>
+          <label className="block text-xs text-[var(--ink-2)]">
+            <span className="font-semibold">Dealer website (optional)</span>
             <input
               value={website}
               onChange={e => setWebsite(e.target.value)}
               type="url"
-              className="mt-1 w-full border border-[#E2E8F0] px-3 py-2 text-sm focus:outline-none focus:border-[#4BA5A5]"
+              className="mom-field mt-1.5 text-sm"
               placeholder="https://www.dealerwebsite.com"
             />
           </label>
@@ -158,40 +158,38 @@ export function ClientDealerSetup({
             type="button"
             disabled={pending || !name.trim()}
             onClick={() => void handleLookup()}
-            className="px-4 py-2 text-sm font-medium text-white bg-[#4BA5A5] hover:opacity-90 disabled:opacity-50"
+            className="mom-btn-accent"
           >
             {pending ? 'Looking up…' : 'Look up dealership'}
           </button>
 
           {matches.length > 0 && (
-            <div className="space-y-3 pt-2 border-t border-[#E2E8F0]">
-              <div className="border border-[#FBD38D] bg-[#FFFAF0] px-3 py-2 text-xs text-[#744210]">
+            <div className="space-y-3 pt-2 border-t border-[var(--line)]">
+              <div className="mom-warn px-3 py-2 text-xs">
                 Lookup found {matches.length} location{matches.length === 1 ? '' : 's'}. Click{' '}
-                <span className="font-medium">Confirm and save to map</span> below — the map only
+                <span className="font-semibold">Confirm and save to map</span> below — the map only
                 shows dealerships after you confirm.
               </div>
-              <p className="text-xs font-medium text-[#718096] uppercase tracking-wide">
-                Confirm location
-              </p>
+              <p className="mom-eyebrow">Confirm location</p>
               {matches.map(place => (
                 <div
                   key={place.placeId}
-                  className={`border px-3 py-3 text-sm ${
+                  className={`mom-inset px-3 py-3 text-sm ${
                     place.placeId === preferredId
-                      ? 'border-[#4BA5A5] bg-[#4BA5A5]/5'
-                      : 'border-[#E2E8F0]'
+                      ? 'border-[var(--accent-line)] bg-[var(--accent-soft)]'
+                      : ''
                   }`}
                 >
-                  <p className="font-medium text-[#2D3748]">{place.name}</p>
-                  <p className="text-xs text-[#718096] mt-0.5">{place.address}</p>
+                  <p className="font-semibold text-[var(--ink)]">{place.name}</p>
+                  <p className="text-xs text-[var(--muted)] mt-0.5">{place.address}</p>
                   {place.website && (
-                    <p className="text-xs text-[#718096] truncate">{place.website}</p>
+                    <p className="text-xs text-[var(--muted)] truncate">{place.website}</p>
                   )}
                   <button
                     type="button"
                     disabled={pending}
                     onClick={() => void handleConfirm(place)}
-                    className="mt-3 px-4 py-2 text-xs font-medium text-white bg-[#4BA5A5] hover:opacity-90 disabled:opacity-50"
+                    className="mom-btn-accent mt-3 h-9 text-xs"
                   >
                     {pending ? 'Saving…' : 'Confirm and save to map'}
                   </button>
@@ -202,7 +200,7 @@ export function ClientDealerSetup({
         </>
       )}
 
-      {error && <p className="text-sm text-[#C53030]">{error}</p>}
+      {error && <p className="text-sm text-[var(--alert-text)]">{error}</p>}
     </div>
   );
 }

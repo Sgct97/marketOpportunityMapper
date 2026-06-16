@@ -93,9 +93,9 @@ export function CompetitorReview({
 
   if (!clientConfirmed) {
     return (
-      <div className="bg-white border border-[#E2E8F0] p-6">
-        <h3 className="text-sm font-medium text-[#2D3748]">Competitors</h3>
-        <p className="text-xs text-[#718096] mt-1">
+      <div className="mom-card p-6">
+        <h3 className="text-sm font-semibold text-[var(--ink)]">Competitors</h3>
+        <p className="text-xs text-[var(--muted)] mt-1.5">
           Confirm the client dealership above, then search for competitors by brand and radius.
         </p>
       </div>
@@ -103,30 +103,30 @@ export function CompetitorReview({
   }
 
   return (
-    <div className="bg-white border border-[#E2E8F0] p-6 space-y-4">
+    <div className="mom-card p-6 space-y-4">
       <div>
-        <h3 className="text-sm font-medium text-[#2D3748]">Competitors</h3>
-        <p className="text-xs text-[#718096] mt-1">
+        <h3 className="text-sm font-semibold text-[var(--ink)]">Competitors</h3>
+        <p className="text-xs text-[var(--muted)] mt-1.5">
           Search nearby dealers by brand, review results, and save to the map. Saving updates
           competitors for that brand only — other brands already on the map are kept.
         </p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
-        <label className="flex-1 text-xs text-[#2D3748]">
-          <span className="font-medium">Competitor brand</span>
+        <label className="flex-1 text-xs text-[var(--ink-2)]">
+          <span className="font-semibold">Competitor brand</span>
           <input
             value={brand}
             onChange={e => setBrand(e.target.value)}
-            className="mt-1 w-full border border-[#E2E8F0] px-3 py-2 text-sm focus:outline-none focus:border-[#4BA5A5]"
+            className="mom-field mt-1.5 text-sm"
           />
         </label>
-        <label className="text-xs text-[#2D3748] sm:w-28">
-          <span className="font-medium">Radius</span>
+        <label className="text-xs text-[var(--ink-2)] sm:w-28">
+          <span className="font-semibold">Radius</span>
           <select
             value={radiusMiles}
             onChange={e => setRadiusMiles(Number(e.target.value) as RadiusMiles)}
-            className="mt-1 w-full border border-[#E2E8F0] px-2 py-2 text-sm bg-white"
+            className="mom-field mt-1.5 text-sm"
           >
             {RADIUS_MILES_OPTIONS.map(m => (
               <option key={m} value={m}>
@@ -141,17 +141,15 @@ export function CompetitorReview({
         type="button"
         disabled={pending || !brand.trim()}
         onClick={() => void handleSearch()}
-        className="px-4 py-2 text-sm font-medium text-white bg-[#4BA5A5] hover:opacity-90 disabled:opacity-50"
+        className="mom-btn-accent"
       >
         {pending ? 'Searching…' : 'Search competitors'}
       </button>
 
       {candidates.length > 0 && (
-        <div className="space-y-2 border-t border-[#E2E8F0] pt-3">
-          <p className="text-xs font-medium text-[#718096] uppercase tracking-wide">
-            Review results ({candidates.length})
-          </p>
-          <div className="max-h-56 overflow-y-auto space-y-1">
+        <div className="space-y-2 border-t border-[var(--line)] pt-3">
+          <p className="mom-eyebrow">Review results ({candidates.length})</p>
+          <div className="max-h-56 overflow-y-auto space-y-1 mom-scroll">
             {candidates.map(c => (
               <label
                 key={c.placeId}
@@ -161,13 +159,13 @@ export function CompetitorReview({
                   type="checkbox"
                   checked={selected.has(c.placeId)}
                   onChange={() => toggle(c.placeId)}
-                  className="mt-0.5 accent-[#4BA5A5]"
+                  className="mt-0.5 accent-[var(--accent)]"
                 />
                 <span>
-                  <span className="font-medium text-[#2D3748]">{c.name}</span>
-                  <span className="text-[#718096]"> · {c.distanceMiles.toFixed(1)} mi</span>
+                  <span className="font-semibold text-[var(--ink-2)]">{c.name}</span>
+                  <span className="text-[var(--muted)]"> · {c.distanceMiles.toFixed(1)} mi</span>
                   {c.address && (
-                    <span className="block text-[#718096]">{c.address}</span>
+                    <span className="block text-[var(--muted)]">{c.address}</span>
                   )}
                 </span>
               </label>
@@ -177,7 +175,7 @@ export function CompetitorReview({
             type="button"
             disabled={pending}
             onClick={() => void handleSave()}
-            className="text-sm font-medium text-[#4BA5A5] hover:underline"
+            className="mom-link text-sm"
           >
             Save selected to map
           </button>
@@ -185,20 +183,18 @@ export function CompetitorReview({
       )}
 
       {existingCompetitors.length > 0 && (
-        <div className="border-t border-[#E2E8F0] pt-3 space-y-1">
-          <p className="text-xs font-medium text-[#718096] uppercase tracking-wide">
-            On map ({existingCompetitors.length})
-          </p>
+        <div className="border-t border-[var(--line)] pt-3 space-y-1">
+          <p className="mom-eyebrow">On map ({existingCompetitors.length})</p>
           {existingCompetitors.map(c => (
-            <div key={c.id} className="flex justify-between gap-2 text-xs text-[#2D3748] py-1">
+            <div key={c.id} className="flex justify-between gap-2 text-xs text-[var(--ink-2)] py-1">
               <span>
                 {c.name}
-                <span className="text-[#718096]"> · {c.brand}</span>
+                <span className="text-[var(--muted)]"> · {c.brand}</span>
               </span>
               <button
                 type="button"
                 onClick={() => void handleRemove(c.id)}
-                className="text-[#718096] hover:text-[#C53030] shrink-0"
+                className="text-[var(--muted)] hover:text-[var(--alert-text)] shrink-0 transition-colors"
               >
                 Remove
               </button>
@@ -207,8 +203,8 @@ export function CompetitorReview({
         </div>
       )}
 
-      {message && <p className="text-sm text-[#22543D]">{message}</p>}
-      {error && <p className="text-sm text-[#C53030]">{error}</p>}
+      {message && <p className="text-sm text-[var(--success-text)]">{message}</p>}
+      {error && <p className="text-sm text-[var(--alert-text)]">{error}</p>}
     </div>
   );
 }

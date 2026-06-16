@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { PageChrome } from '@/components/PageChrome';
 import { getSuggestedClientFromProject } from '@/app/actions/client-dealer';
 import { renameProject } from '@/app/actions/projects';
 import { AudienceUpload } from '@/components/AudienceUpload';
@@ -63,32 +64,26 @@ export default async function ProjectPage({ params }: Props) {
   const clientReady = Boolean(clientDealer?.latitude && clientDealer?.longitude);
 
   return (
-    <div className="min-h-screen bg-[#FAFBFC]">
-      <header className="bg-white border-b border-[#E2E8F0] px-6 py-4">
-        <Link href="/" className="text-sm text-[#4BA5A5] hover:underline">
-          ← Projects
-        </Link>
-      </header>
-
-      <main className="max-w-4xl mx-auto px-6 py-10">
-        <form action={rename} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+    <PageChrome title="Project setup" backHref="/" backLabel="Projects">
+      <main className="max-w-4xl mx-auto px-6 py-10 mom-fade-up">
+        <form
+          action={rename}
+          className="mom-card p-5 flex flex-col sm:flex-row gap-3 items-start sm:items-end"
+        >
           <label className="flex-1 w-full text-sm">
-            <span className="font-medium text-[#4BA5A5]">Project name</span>
+            <span className="mom-eyebrow">Project name</span>
             <input
               name="name"
               defaultValue={project.name}
-              className="mt-1 w-full border border-[#E2E8F0] px-3 py-2 text-lg font-semibold text-[#1A202C] focus:outline-none focus:border-[#4BA5A5]"
+              className="mom-field mt-2 text-lg font-semibold"
             />
           </label>
-          <button
-            type="submit"
-            className="px-4 py-2 text-sm border border-[#E2E8F0] text-[#2D3748] hover:bg-white"
-          >
+          <button type="submit" className="mom-btn">
             Save name
           </button>
         </form>
 
-        <section className="mt-10 space-y-4">
+        <section className="mt-8 space-y-4">
           <AudienceUpload projectId={id} />
           <AudienceDatasetList
             projectId={id}
@@ -137,7 +132,7 @@ export default async function ProjectPage({ params }: Props) {
         )}
 
         <details className="mt-6">
-          <summary className="text-xs text-[#718096] cursor-pointer hover:text-[#4BA5A5]">
+          <summary className="text-xs text-[var(--muted)] cursor-pointer hover:text-[var(--accent)] transition-colors">
             Advanced: upload dealership spreadsheet (optional fallback)
           </summary>
           <section className="mt-4 space-y-4">
@@ -155,9 +150,9 @@ export default async function ProjectPage({ params }: Props) {
           </section>
         </details>
 
-        <section className="mt-8 bg-white border border-[#E2E8F0] p-6">
-          <h3 className="text-sm font-medium text-[#2D3748]">Market opportunity map</h3>
-          <p className="text-xs text-[#718096] mt-1 mb-4">
+        <section className="mt-8 mom-card p-6">
+          <h3 className="text-sm font-semibold text-[var(--ink)]">Market opportunity map</h3>
+          <p className="text-xs text-[var(--muted)] mt-1.5 mb-4">
             {hasAudience
               ? clientReady
                 ? 'Present ZIP-level audience with confirmed client dealership and competitors.'
@@ -165,17 +160,14 @@ export default async function ProjectPage({ params }: Props) {
               : 'Upload audience data to enable the map.'}
           </p>
           {hasAudience ? (
-            <Link
-              href={`/projects/${id}/map`}
-              className="inline-block px-5 py-2.5 text-sm font-medium text-white bg-[#4BA5A5] hover:opacity-90"
-            >
+            <Link href={`/projects/${id}/map`} className="mom-btn-accent">
               Open presentation map →
             </Link>
           ) : (
-            <span className="text-xs text-[#A0AEC0]">Upload required</span>
+            <span className="text-xs text-[var(--faint)]">Upload required</span>
           )}
         </section>
       </main>
-    </div>
+    </PageChrome>
   );
 }

@@ -47,17 +47,17 @@ export function AudienceUpload({ projectId }: Props) {
   }
 
   return (
-    <div className="bg-white border border-[#E2E8F0] p-6">
-      <h3 className="text-sm font-medium text-[#2D3748]">Audience data</h3>
-      <p className="text-xs text-[#718096] mt-1 mb-4">
-        CSV/XLSX: long format (ZIP, Audience Type, Count) or wide format (ZIP/ZIPS + segment columns per Brittany&apos;s exports)
+    <div className="mom-card p-6">
+      <h3 className="text-sm font-semibold text-[var(--ink)]">Audience data</h3>
+      <p className="text-xs text-[var(--muted)] mt-1.5 mb-4">
+        CSV/XLSX: long format (ZIP, Audience Type, Count) or wide format (ZIP/ZIPS + one column per segment)
       </p>
 
       <div
         onDragOver={e => e.preventDefault()}
         onDrop={onDrop}
         onClick={() => inputRef.current?.click()}
-        className="border-2 border-dashed border-[#E2E8F0] rounded-sm px-6 py-10 text-center cursor-pointer hover:border-[#4BA5A5] hover:bg-[#F7FAFC] transition-colors"
+        className="mom-dropzone px-6 py-10 text-center cursor-pointer"
       >
         <input
           ref={inputRef}
@@ -66,19 +66,19 @@ export function AudienceUpload({ projectId }: Props) {
           className="hidden"
           onChange={onInputChange}
         />
-        <p className="text-sm text-[#2D3748]">
+        <p className="text-sm font-medium text-[var(--ink-2)]">
           {pending ? 'Importing…' : 'Drag and drop a file, or click to browse'}
         </p>
-        <p className="text-xs text-[#A0AEC0] mt-1">.csv, .xlsx</p>
+        <p className="text-xs text-[var(--faint)] mt-1">.csv, .xlsx</p>
       </div>
 
       {error && (
-        <p className="mt-4 text-sm text-[#C53030]">{error}</p>
+        <p className="mt-4 text-sm text-[var(--alert-text)]">{error}</p>
       )}
 
       {summary && (
-        <div className="mt-4 p-4 bg-[#F0FFF4] border border-[#9AE6B4] text-sm text-[#22543D] space-y-1">
-          <p className="font-medium">Import complete: {summary.fileName}</p>
+        <div className="mom-success mt-4 p-4 text-sm space-y-1">
+          <p className="font-semibold">Import complete: {summary.fileName}</p>
           <p>Rows processed: {summary.rowsProcessed.toLocaleString()}</p>
           <p>Rows imported: {summary.rowsImported.toLocaleString()}</p>
           {summary.invalidRows > 0 && (

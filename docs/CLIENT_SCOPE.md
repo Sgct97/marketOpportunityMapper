@@ -1,6 +1,6 @@
 # Client Scope Traceability
 
-Source: client scope email (Brittany). Maps each ask to MVP, Phase 2 (~15h), or later.
+Source: client scope email. Maps each ask to MVP, Phase 2 (~15h), or later.
 
 ## Project goal
 
@@ -46,7 +46,7 @@ Source: client scope email (Brittany). Maps each ask to MVP, Phase 2 (~15h), or 
 
 ## Client communication — dealership data
 
-**MVP inputs:** audience file + **client dealer website** (Brittany, June 2026). Filename suggests client name; website pinpoints the store when names are ambiguous. Separate dealership spreadsheet is optional fallback only.
+**MVP inputs:** audience file + **client dealer website** (June 2026). Filename suggests client name; website pinpoints the store when names are ambiguous. Separate dealership spreadsheet is optional fallback only.
 
 ## Competitive visualization
 
@@ -86,4 +86,4 @@ Source: client scope email (Brittany). Maps each ask to MVP, Phase 2 (~15h), or 
 
 ## Client communication — competitor lookup
 
-**MVP (revised June 2026):** automatic competitor lookup by brand + radius is **in MVP**, with human review before saving pins. Brittany supplies audience files + dealer website; no separate dealer file required for typical pitches.
+**MVP (revised June 2026):** automatic competitor lookup by brand + radius is **in MVP**, with human review before saving pins. The client supplies audience files + dealer website; no separate dealer file required for typical pitches.

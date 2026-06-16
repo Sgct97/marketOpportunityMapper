@@ -18,23 +18,19 @@ export function CreateProjectForm() {
   }
 
   return (
-    <form action={handleSubmit} className="mt-6 flex flex-col sm:flex-row gap-3">
+    <form action={handleSubmit} className="flex flex-col sm:flex-row gap-3">
       <input
         name="name"
         type="text"
         required
         placeholder="e.g. DFW Hyundai — Q2 pitch"
-        className="flex-1 border border-[#E2E8F0] px-3 py-2 text-sm focus:outline-none focus:border-[#4BA5A5]"
+        className="mom-field flex-1"
         disabled={pending}
       />
-      <button
-        type="submit"
-        disabled={pending}
-        className="px-4 py-2 text-sm font-medium text-white bg-[#4BA5A5] hover:opacity-90 disabled:opacity-50 whitespace-nowrap"
-      >
+      <button type="submit" disabled={pending} className="mom-btn-accent">
         {pending ? 'Creating…' : 'New project'}
       </button>
-      {error && <p className="text-sm text-[#C53030] sm:basis-full">{error}</p>}
+      {error && <p className="text-sm text-[var(--alert-text)] sm:basis-full">{error}</p>}
     </form>
   );
 }

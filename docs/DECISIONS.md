@@ -4,7 +4,7 @@ Recorded decisions from product/architecture review (May 2026). Update this file
 
 ## North star
 
-The **client scope email** (Brittany) is the product definition.
+The **client scope email** is the product definition.
 
 ## Stack
 
@@ -18,7 +18,7 @@ The **client scope email** (Brittany) is the product definition.
 
 ## MVP inputs (revised June 2026)
 
-Brittany confirmed pitches use **audience files only** plus **dealer website** for pinpointing the client store.
+The client confirmed pitches use **audience files only** plus **dealer website** for pinpointing the client store.
 
 | Input | Required |
 | --- | --- |

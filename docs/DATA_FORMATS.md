@@ -34,7 +34,7 @@ Validation rules:
 - Duplicate rows with same ZIP + Audience Type should be summed.
 - Invalid rows should be reported in an import summary.
 
-### Wide format (Brittany exports — Hyundai / Toyota)
+### Wide format (client exports — e.g. Hyundai / Toyota)
 
 One row per ZIP; each **segment is its own column** (counts in cells).
 
@@ -53,7 +53,7 @@ Sample files for local testing live in `fixtures/*.xlsx` (gitignored).
 **Primary path:** no separate dealership file. After audience upload:
 
 1. System suggests client dealer name from the **audience filename** (e.g. `Hyundai Glendora April.xlsx`).
-2. User enters **dealer website** (Brittany: best way to pinpoint the store).
+2. User enters **dealer website** (the best way to pinpoint the store).
 3. User **confirms** the resolved location (human verification).
 4. User searches **competitors by brand + radius** via Google Places; reviews and saves selections.
 

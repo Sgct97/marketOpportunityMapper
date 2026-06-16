@@ -24,26 +24,24 @@ export function DealershipDatasetList({ projectId, datasets }: Props) {
 
   return (
     <div className="mt-4">
-      <h4 className="text-xs font-medium text-[#718096] uppercase tracking-wide mb-2">
-        Dataset versions
-      </h4>
+      <h4 className="mom-eyebrow mb-2">Dataset versions</h4>
       <ul className="space-y-2">
         {datasets.map(d => (
           <li
             key={d.id}
-            className="flex items-center justify-between text-sm border border-[#E2E8F0] px-3 py-2 bg-[#FAFBFC]"
+            className="mom-inset flex items-center justify-between text-sm px-3 py-2"
           >
-            <span className="text-[#2D3748]">
+            <span className="text-[var(--ink-2)]">
               {d.label || d.upload?.file_name || 'Untitled'}
               {d.is_active && (
-                <span className="ml-2 text-xs text-[#4BA5A5] font-medium">Active</span>
+                <span className="ml-2 text-xs text-[var(--accent)] font-semibold">Active</span>
               )}
             </span>
             {!d.is_active && (
               <button
                 type="button"
                 onClick={() => handleActivate(d.id)}
-                className="text-xs text-[#4BA5A5] hover:underline"
+                className="mom-link text-xs"
               >
                 Set active
               </button>
