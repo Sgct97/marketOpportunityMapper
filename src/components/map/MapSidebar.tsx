@@ -36,6 +36,21 @@ interface Props {
   onToggleRadiusLayer: (visible: boolean) => void;
   marketAnalysis: MarketAnalysis | null;
   hasFocusDealership: boolean;
+  onCollapse?: () => void;
+}
+
+function CollapseIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M13 6l6 6-6 6M5 6l6 6-6 6"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 function Switch({
@@ -100,6 +115,7 @@ export function MapSidebar({
   onToggleRadiusLayer,
   marketAnalysis,
   hasFocusDealership,
+  onCollapse,
 }: Props) {
   const rgb = hexToRgb(primaryColor);
   const stops = legendStops(maxCount);
@@ -108,7 +124,20 @@ export function MapSidebar({
   return (
     <aside className="mom-panel mom-scroll w-full lg:w-[372px] shrink-0 border-l border-[var(--line)] flex flex-col max-h-[52vh] lg:max-h-none lg:h-full overflow-y-auto">
       <div className="px-6 pt-5 pb-4 border-b border-[var(--line-soft)]">
-        <h2 className="mom-eyebrow">Map controls</h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="mom-eyebrow">Map controls</h2>
+          {onCollapse && (
+            <button
+              type="button"
+              onClick={onCollapse}
+              className="mom-icon-btn -mt-1.5 -mr-1.5 h-8 w-8"
+              title="Collapse controls"
+              aria-label="Collapse controls"
+            >
+              <CollapseIcon />
+            </button>
+          )}
+        </div>
         {datasetLabel && (
           <p className="mt-1.5 text-[12px] text-[var(--muted)] truncate" title={datasetLabel}>
             {datasetLabel}

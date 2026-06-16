@@ -356,7 +356,7 @@ export function OpportunityMap({
     setLayerVisibility(map, ['zip-fill', 'zip-outline'], showZipLayer);
     setLayerVisibility(map, [CLIENT_DEALERSHIP_LAYER], showClientDealershipLayer);
     setLayerVisibility(map, [COMPETITOR_DEALERSHIP_LAYER], showCompetitorLayer);
-    setLayerVisibility(map, ['radius-fill', 'radius-outline'], showRadiusLayer);
+    setLayerVisibility(map, ['radius-fill', 'radius-glow', 'radius-outline'], showRadiusLayer);
 
     updateDealershipSources(map, {
       dealers: dealerships,

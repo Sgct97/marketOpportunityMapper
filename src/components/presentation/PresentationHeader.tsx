@@ -99,7 +99,7 @@ export function PresentationHeader({
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <Link
           href="/"
-          className="hidden sm:inline-flex items-center gap-1.5 text-[13px] text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
+          className="mom-nav-btn hidden sm:inline-flex items-center gap-1.5"
           title="Back to all projects"
         >
           <HomeIcon />
@@ -107,10 +107,11 @@ export function PresentationHeader({
         </Link>
         <Link
           href={`/projects/${projectId}`}
-          className="hidden sm:inline-flex items-center text-[13px] text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
+          className="mom-nav-btn hidden sm:inline-flex items-center gap-1.5"
           title="Back to project setup"
         >
-          ← Setup
+          <span aria-hidden>←</span>
+          Setup
         </Link>
         <span className="hidden sm:block h-6 w-px bg-[var(--line)]" />
         <span

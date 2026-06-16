@@ -90,7 +90,22 @@ export function ensureDealershipLayers(map: maplibregl.Map, clientColor: string)
       source: 'radius-areas',
       paint: {
         'fill-color': clientColor,
-        'fill-opacity': 0.09,
+        'fill-opacity': 0.12,
+      },
+    });
+  }
+
+  // Soft glow underlay so the ring reads clearly over any basemap.
+  if (!map.getLayer('radius-glow')) {
+    map.addLayer({
+      id: 'radius-glow',
+      type: 'line',
+      source: 'radius-areas',
+      paint: {
+        'line-color': clientColor,
+        'line-width': 9,
+        'line-opacity': 0.18,
+        'line-blur': 6,
       },
     });
   }
@@ -102,9 +117,9 @@ export function ensureDealershipLayers(map: maplibregl.Map, clientColor: string)
       source: 'radius-areas',
       paint: {
         'line-color': clientColor,
-        'line-width': 2,
-        'line-opacity': 0.55,
-        'line-dasharray': [2, 2],
+        'line-width': 3.5,
+        'line-opacity': 0.95,
+        'line-dasharray': [2, 1.4],
       },
     });
   }

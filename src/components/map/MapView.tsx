@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useCallback, useState } from 'react';
 import type { AudienceZipRow } from '@/lib/audience/aggregate';
 import type { MarketAnalysis } from '@/lib/audience/market-analysis';
 import type { MapTheme } from '@/lib/map/basemap';
@@ -57,9 +58,31 @@ interface Props {
   hasFocusDealership: boolean;
 }
 
-export function MapView(props: Props) {
+function ControlsIcon() {
   return (
-    <div className="flex flex-1 flex-col lg:flex-row min-h-0 overflow-hidden">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 7h11M19 7h1M4 12h5M13 12h7M4 17h9M17 17h3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <circle cx="17" cy="7" r="2" stroke="currentColor" strokeWidth="1.7" />
+      <circle cx="11" cy="12" r="2" stroke="currentColor" strokeWidth="1.7" />
+      <circle cx="15" cy="17" r="2" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+export function MapView(props: Props) {
+  const [controlsOpen, setControlsOpen] = useState(true);
+
+  // The map fills the freed space when controls collapse; MapLibre tracks the
+  // window resize event, so nudge it after the layout settles.
+  const setControls = useCallback((open: boolean) => {
+    setControlsOpen(open);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+    });
+  }, []);
+
+  return (
+    <div className="relative flex flex-1 flex-col lg:flex-row min-h-0 overflow-hidden">
       <OpportunityMap
         key={props.theme}
         theme={props.theme}
@@ -77,7 +100,22 @@ export function MapView(props: Props) {
         showRadiusLayer={props.showRadiusLayer}
         onFocusDealership={props.onFocusDealership}
       />
+
+      {!controlsOpen && (
+        <button
+          type="button"
+          onClick={() => setControls(true)}
+          className="mom-nav-btn absolute left-4 top-4 z-10 inline-flex items-center gap-2 shadow-lg"
+          title="Show map controls"
+        >
+          <ControlsIcon />
+          Controls
+        </button>
+      )}
+
+      {controlsOpen && (
       <MapSidebar
+        onCollapse={() => setControls(false)}
         audienceTypes={props.audienceTypes}
         selectedTypes={props.selectedTypes}
         onToggleType={props.onToggleType}
@@ -107,6 +145,7 @@ export function MapView(props: Props) {
         marketAnalysis={props.marketAnalysis}
         hasFocusDealership={props.hasFocusDealership}
       />
+      )}
     </div>
   );
 }
