@@ -90,13 +90,16 @@ export async function saveCompetitorSelection(
 
     const clientRow = (client as DealershipRow | null) ?? null;
 
+    const normalizedBrand = brand.trim();
+    if (!normalizedBrand) return { error: 'Brand is required.' };
+
     const filtered = selected.filter(
       c =>
         !isDuplicateOfClient(
           {
             id: c.placeId,
             name: c.name,
-            brand,
+            brand: normalizedBrand,
             role: 'competitor',
             latitude: c.latitude,
             longitude: c.longitude,
@@ -107,18 +110,20 @@ export async function saveCompetitorSelection(
         )
     );
 
+    // Replace competitors for this brand only; keep other brands already on the map.
     await supabase
       .from('dealerships')
       .delete()
       .eq('dataset_id', datasetId)
       .eq('role', 'competitor')
-      .eq('source', 'api');
+      .eq('source', 'api')
+      .ilike('brand', normalizedBrand);
 
     if (filtered.length > 0) {
       const rows = filtered.map(c => ({
         dataset_id: datasetId,
         name: c.name,
-        brand,
+        brand: normalizedBrand,
         role: 'competitor' as const,
         latitude: c.latitude,
         longitude: c.longitude,

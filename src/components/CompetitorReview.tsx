@@ -107,7 +107,8 @@ export function CompetitorReview({
       <div>
         <h3 className="text-sm font-medium text-[#2D3748]">Competitors</h3>
         <p className="text-xs text-[#718096] mt-1">
-          Search nearby dealers by brand, review results, and save to the map.
+          Search nearby dealers by brand, review results, and save to the map. Saving updates
+          competitors for that brand only — other brands already on the map are kept.
         </p>
       </div>
 
@@ -190,7 +191,10 @@ export function CompetitorReview({
           </p>
           {existingCompetitors.map(c => (
             <div key={c.id} className="flex justify-between gap-2 text-xs text-[#2D3748] py-1">
-              <span>{c.name}</span>
+              <span>
+                {c.name}
+                <span className="text-[#718096]"> · {c.brand}</span>
+              </span>
               <button
                 type="button"
                 onClick={() => void handleRemove(c.id)}
