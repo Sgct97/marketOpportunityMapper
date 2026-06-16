@@ -36,8 +36,7 @@ export function DashboardView({
     segmentCount,
     segments,
     topSegment,
-    ethnicity,
-    intent,
+    composition,
     concentration,
     tradeArea,
     competitive,
@@ -51,7 +50,20 @@ export function DashboardView({
   const maxSegmentTotal = topSegment?.total ?? 1;
   const topZipMax = topZips[0]?.count ?? 1;
   const subjectName = focusName || brandName;
-  const hasComposition = ethnicity.length > 0 || intent.length > 0;
+  const compositionFacets = composition.slice(0, 2);
+  const hasComposition = compositionFacets.length > 0;
+
+  // Hero leads with the LARGEST SINGLE SEGMENT — a real, non-overlapping
+  // headcount we can defend to a client. The summed multi-segment "reach"
+  // (which double-counts people across segments) is demoted to a supporting
+  // line and a KPI, never the headline. Concentration tells the geographic story.
+  const heroReach = useTradeArea ? tradeArea!.audienceInRadius : totalAudience;
+  const heroZips = useTradeArea ? tradeArea!.zipsInRadius : totalZips;
+  const heroScope = useTradeArea ? `within ${subjectName}'s ${radiusMiles}-mi trade area` : 'across the market';
+  const leadSegment = (useTradeArea ? tradeArea!.leadSegment : null) ?? topSegment;
+  const conc = useTradeArea
+    ? { top5Share: tradeArea!.top5Share, zipsForHalf: tradeArea!.zipsForHalf }
+    : { top5Share: concentration.top5Share, zipsForHalf: concentration.zipsForHalf };
 
   return (
     <div className="mom-scroll flex-1 overflow-y-auto">
@@ -63,29 +75,42 @@ export function DashboardView({
             style={{ background: 'var(--accent-soft)' }}
             aria-hidden
           />
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
+          <div className="relative flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-2xl">
               <div className="flex items-center gap-2.5">
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--accent)', boxShadow: '0 0 10px var(--accent)' }} />
                 <p className="mom-eyebrow">Market opportunity · {subjectName}</p>
               </div>
-              <h2 className="mt-4 text-[26px] sm:text-[32px] font-semibold leading-[1.18] tracking-tight text-[var(--ink)]">
-                <span className="mom-display-accent tnum">{formatNumber(totalAudience)}</span>{' '}
-                addressable audience across{' '}
-                <span className="tnum text-[var(--ink)]">{formatNumber(totalZips)}</span> ZIP codes
-                and {segmentCount} segments.
-                {useTradeArea && (
-                  <>
-                    {' '}
-                    <span className="text-[var(--ink-2)]">
-                      {formatPercent(tradeArea!.share)} sits within{' '}
-                      {subjectName ? `${subjectName}'s` : 'the'} {radiusMiles}-mile trade area.
-                    </span>
-                  </>
+              <div className="mt-4 flex items-end gap-3">
+                <span className="mom-display-accent text-[56px] sm:text-[68px] font-semibold leading-[0.9] tnum">
+                  {leadSegment ? formatCompact(leadSegment.total) : '—'}
+                </span>
+                {leadSegment && (
+                  <span className="mb-2 text-[15px] font-bold tnum" style={{ color: 'var(--accent)' }}>
+                    {formatPercent(leadSegment.share)} of reach
+                  </span>
                 )}
-              </h2>
+              </div>
+              <p className="mt-2 text-[15px] sm:text-[16px] font-semibold leading-snug text-[var(--ink)]">
+                {leadSegment ? leadSegment.name : 'No segments in file'}
+              </p>
+              <p className="mt-1 text-[13px] text-[var(--faint)]">
+                Largest single audience{useTradeArea ? ' in the trade area' : ''} — a true headcount, not a sum.
+              </p>
+              <p className="mt-3 text-[14px] sm:text-[15px] leading-relaxed text-[var(--ink-2)]">
+                Part of <span className="tnum font-semibold text-[var(--ink)]">{formatNumber(heroReach)}</span> in
+                total reach across {segmentCount} segments {heroScope}, spanning{' '}
+                <span className="tnum font-semibold text-[var(--ink)]">{formatNumber(heroZips)}</span> ZIP codes.
+              </p>
+              <p className="mt-3 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] leading-snug"
+                style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent-line)', color: 'var(--ink-2)' }}>
+                <span className="font-semibold" style={{ color: 'var(--accent)' }}>
+                  {formatPercent(conc.top5Share)}
+                </span>
+                concentrated in the top 5 ZIPs · {formatNumber(conc.zipsForHalf)} ZIPs make up half the reach.
+              </p>
             </div>
-            <div className="shrink-0">
+            <div className="shrink-0 lg:text-right">
               <span
                 className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold"
                 style={{
@@ -104,24 +129,24 @@ export function DashboardView({
         {/* KPI row */}
         <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
           <KpiCard
-            label="Addressable audience"
-            value={formatCompact(totalAudience)}
+            label="Total reach (all segments)"
+            value={formatCompact(heroReach)}
+            accent={useTradeArea ? formatPercent(tradeArea!.share) : null}
             icon={<IconUsers />}
-            sub={`${formatNumber(totalZips)} ZIPs · ${segmentCount} segments`}
+            sub={`${segmentCount} segments · ${formatNumber(heroZips)} ZIPs · overlapping`}
             delay={40}
           />
           {useTradeArea ? (
             <KpiCard
-              label={`Within ${radiusMiles} mi`}
-              value={formatCompact(tradeArea!.audienceInRadius)}
-              accent={formatPercent(tradeArea!.share)}
+              label="Full-market reach"
+              value={formatCompact(totalAudience)}
               icon={<IconTarget />}
-              sub={`of total market · ${formatNumber(tradeArea!.zipsInRadius)} ZIPs`}
+              sub={`${formatNumber(totalZips)} ZIPs across the market`}
               delay={100}
             />
           ) : (
             <KpiCard
-              label="Lead segment"
+              label="Lead segment share"
               value={topSegment ? formatPercent(topSegment.share) : '—'}
               icon={<IconTarget />}
               sub={topSegment?.name ?? 'No segments'}
@@ -130,9 +155,9 @@ export function DashboardView({
           )}
           <KpiCard
             label="Market concentration"
-            value={formatPercent(concentration.top5Share)}
+            value={formatPercent(conc.top5Share)}
             icon={<IconLayers />}
-            sub={`from the top 5 ZIPs · ${formatNumber(concentration.zipsForHalf)} ZIPs make up half`}
+            sub={`from the top 5 ZIPs · ${formatNumber(conc.zipsForHalf)} ZIPs make up half`}
             delay={160}
           />
           {competitive.competitorCount > 0 ? (
@@ -157,14 +182,16 @@ export function DashboardView({
         {/* Composition */}
         {hasComposition && (
           <div className="mt-5">
-            <SectionCard eyebrow="Who they are" title="Audience composition">
+            <SectionCard eyebrow="Grouped from segment names" title="Audience composition">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-7 md:gap-10">
-                {ethnicity.length > 0 && (
-                  <Donut title="Ethnicity" buckets={ethnicity} accent={glow} />
-                )}
-                {intent.length > 0 && (
-                  <Donut title="Intent" buckets={intent} accent={glow} />
-                )}
+                {compositionFacets.map(facet => (
+                  <Donut
+                    key={facet.id}
+                    title={facet.buckets[0]?.label ?? ''}
+                    buckets={facet.buckets}
+                    accent={glow}
+                  />
+                ))}
               </div>
             </SectionCard>
           </div>
@@ -297,9 +324,10 @@ export function DashboardView({
         {/* Methodology */}
         <p className="mt-7 text-[11px] leading-relaxed text-[var(--faint)] max-w-3xl">
           {datasetLabel ? `Source: ${datasetLabel}. ` : ''}
-          Audience is the sum of all segment counts in the active file; individuals may appear in
-          more than one segment. Trade-area figures use straight-line distance from the client pin to
-          ZIP centroids (not drive-time).
+          “Reach” is the sum of segment counts across the active file; the same person can belong to
+          more than one segment, so reach reflects total addressable touchpoints, not unique
+          individuals. Trade-area figures use straight-line distance from the client pin to ZIP
+          centroids (not drive-time).
         </p>
       </div>
     </div>

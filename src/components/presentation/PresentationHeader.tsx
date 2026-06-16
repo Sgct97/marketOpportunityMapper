@@ -3,6 +3,7 @@
 import Link from 'next/link';
 
 export type PresentationView = 'map' | 'dashboard';
+export type PresentationTheme = 'dark' | 'light';
 
 interface Props {
   projectId: string;
@@ -11,6 +12,49 @@ interface Props {
   view: PresentationView;
   onViewChange: (view: PresentationView) => void;
   contextLabel?: string | null;
+  theme: PresentationTheme;
+  onToggleTheme: () => void;
+}
+
+function SunIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="4.2" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M20 13.5A8 8 0 0 1 10.5 4a7 7 0 1 0 9.5 9.5Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 11.5 12 4l8 7.5M6 10v9h12v-9"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 function MapIcon() {
@@ -45,18 +89,22 @@ export function PresentationHeader({
   view,
   onViewChange,
   contextLabel,
+  theme,
+  onToggleTheme,
 }: Props) {
   const monogram = (brandName?.trim()?.[0] ?? 'M').toUpperCase();
 
   return (
-    <header
-      className="relative z-20 flex items-center justify-between gap-4 border-b border-[var(--line)] px-4 sm:px-6 h-16 shrink-0 backdrop-blur-xl"
-      style={{
-        background: 'linear-gradient(180deg, rgba(12,18,32,0.82), rgba(8,12,22,0.72))',
-        boxShadow: '0 1px 0 rgba(255,255,255,0.04) inset, 0 14px 30px -24px rgba(0,0,0,0.9)',
-      }}
-    >
+    <header className="mom-topbar relative z-20 flex items-center justify-between gap-4 border-b border-[var(--line)] px-4 sm:px-6 h-16 shrink-0">
       <div className="flex items-center gap-3 min-w-0 flex-1">
+        <Link
+          href="/"
+          className="hidden sm:inline-flex items-center gap-1.5 text-[13px] text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
+          title="Back to all projects"
+        >
+          <HomeIcon />
+          Projects
+        </Link>
         <Link
           href={`/projects/${projectId}`}
           className="hidden sm:inline-flex items-center text-[13px] text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
@@ -114,10 +162,19 @@ export function PresentationHeader({
 
       <div className="flex items-center justify-end gap-3 min-w-0 flex-1">
         {contextLabel && (
-          <span className="hidden lg:block text-[12.5px] text-[var(--muted)] truncate max-w-[260px]">
+          <span className="hidden lg:block text-[12.5px] text-[var(--muted)] truncate max-w-[240px]">
             {contextLabel}
           </span>
         )}
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          className="mom-icon-btn"
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+        </button>
         <span
           className="hidden md:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold"
           style={{

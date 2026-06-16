@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import type { AudienceZipRow } from '@/lib/audience/aggregate';
 import type { MarketAnalysis } from '@/lib/audience/market-analysis';
+import type { MapTheme } from '@/lib/map/basemap';
 import type { DealershipRow } from '@/lib/dealership/types';
 import type { RadiusMiles } from '@/lib/projects/settings';
 import { MapSidebar } from './MapSidebar';
@@ -21,6 +22,7 @@ const OpportunityMap = dynamic(
 
 interface Props {
   active: boolean;
+  theme: MapTheme;
   rows: AudienceZipRow[];
   selectedTypes: string[];
   primaryColor: string;
@@ -59,6 +61,8 @@ export function MapView(props: Props) {
   return (
     <div className="flex flex-1 flex-col lg:flex-row min-h-0 overflow-hidden">
       <OpportunityMap
+        key={props.theme}
+        theme={props.theme}
         active={props.active}
         rows={props.rows}
         selectedTypes={props.selectedTypes}

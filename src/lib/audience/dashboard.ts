@@ -26,6 +26,18 @@ export interface CompositionBucket {
   share: number;
 }
 
+/**
+ * A composition "facet" — one auto-discovered way the audience splits (e.g.
+ * Hispanic vs Non-Hispanic, or Owners vs Intenders). Buckets are mutually
+ * exclusive within a facet.
+ */
+export interface CompositionFacet {
+  id: string;
+  buckets: CompositionBucket[];
+  /** Share of total audience held by named (non-Other) buckets, 0–1. */
+  coverage: number;
+}
+
 export interface TopZip {
   zip: string;
   count: number;
@@ -40,6 +52,12 @@ export interface TradeAreaStats {
   share: number;
   centroidsResolved: boolean;
   topZips: TopZip[];
+  /** Share of in-radius audience held by the top 5 ZIPs, 0–1. */
+  top5Share: number;
+  /** Number of in-radius ZIPs that together hold the first 50% of audience. */
+  zipsForHalf: number;
+  /** Largest single segment within the trade area (a real, non-overlapping count). */
+  leadSegment: SegmentTotal | null;
 }
 
 export interface WhiteSpaceStats {
@@ -69,8 +87,7 @@ export interface DashboardModel {
   segmentCount: number;
   segments: SegmentTotal[];
   topSegment: SegmentTotal | null;
-  ethnicity: CompositionBucket[];
-  intent: CompositionBucket[];
+  composition: CompositionFacet[];
   concentration: ConcentrationStats;
   tradeArea: TradeAreaStats | null;
   competitive: CompetitiveStats;
@@ -145,83 +162,153 @@ function concentration(byZip: Record<string, number>, total: number): Concentrat
 }
 
 /**
- * Audience composition by ethnicity, derived from segment names. Returns an
- * empty array unless both Hispanic and Non-Hispanic segments are present (so we
- * never show a misleading single-bucket chart for files without that split).
+ * Adaptive audience composition.
+ *
+ * Instead of hardcoding categories (ethnicity, intent, …), we read the segment
+ * names of whatever file is loaded and auto-discover the natural groupings
+ * present in it: recurring words that split the segments into a few mutually
+ * exclusive buckets (e.g. "Hispanic / Non-Hispanic", or "EV / Luxury / Service").
+ * Everything is derived from the data — nothing is assumed — and the UI labels
+ * these as "grouped from segment names" so it's clear they're derived.
  */
-export function ethnicityComposition(segments: SegmentTotal[]): CompositionBucket[] {
-  const buckets = new Map<string, number>();
-  let grand = 0;
-  let hasHispanic = false;
-  let hasNonHispanic = false;
 
-  for (const seg of segments) {
-    const label = classifyEthnicity(seg.name);
-    if (label === 'Hispanic') hasHispanic = true;
-    if (label === 'Non-Hispanic') hasNonHispanic = true;
-    buckets.set(label, (buckets.get(label) ?? 0) + seg.total);
-    grand += seg.total;
+// Structural / filler words that never make meaningful groupings.
+const FACET_STOPWORDS = new Set([
+  'all', 'other', 'others', 'new', 'the', 'and', 'or', 'of', 'a', 'an', 'to', 'for',
+  'with', 'in', 'on', 'by', 'auto', 'autos', 'vehicle', 'vehicles', 'car', 'cars',
+  'no', 'years', 'year', 'old', 'yr', 'yrs', 'mo', 'month', 'months', 'propensity',
+  'reduction', 'payment',
+]);
+
+/** Tokenize a segment name into meaningful, de-duplicated words. */
+export function facetTokens(name: string): string[] {
+  const lower = name.toLowerCase();
+  // Keep "non-x" as a single token so "Non-Hispanic" never counts as "Hispanic".
+  const collapsed = lower.replace(/non[-\s]*([a-z]+)/g, 'non-$1');
+  const tokens = new Set<string>();
+  for (let part of collapsed.split(/[^a-z-]+/)) {
+    part = part.replace(/^-+|-+$/g, '');
+    if (part.length < 2 || FACET_STOPWORDS.has(part)) continue;
+    tokens.add(part);
   }
+  return [...tokens];
+}
 
-  if (!hasHispanic || !hasNonHispanic) return [];
+function prettyToken(token: string): string {
+  return token
+    .split('-')
+    .map(p => (p ? p.charAt(0).toUpperCase() + p.slice(1) : p))
+    .join('-');
+}
 
-  return orderBuckets(buckets, grand, ['Hispanic', 'Non-Hispanic', 'General']);
+interface FacetToken {
+  label: string;
+  segs: Set<number>;
+  total: number;
+}
+
+function isDisjoint(a: Set<number>, b: Set<number>): boolean {
+  for (const x of a) if (b.has(x)) return false;
+  return true;
 }
 
 /**
- * Audience composition by intent: in-market shoppers vs. current owners vs.
- * service/finance/other. Returns an empty array unless at least two buckets are
- * present so the card always adds signal.
+ * Tokens that mark the exact same set of segments describe one thing (e.g.
+ * "HYUNDAI/KIA" → hyundai + kia), so merge them into a single labeled bucket.
  */
-export function intentComposition(segments: SegmentTotal[]): CompositionBucket[] {
-  const buckets = new Map<string, number>();
-  let grand = 0;
+function mergeIdenticalTokens(candidates: FacetToken[]): FacetToken[] {
+  const byKey = new Map<string, { labels: string[]; segs: Set<number>; total: number }>();
+  for (const c of candidates) {
+    const key = [...c.segs].sort((a, b) => a - b).join(',');
+    const entry = byKey.get(key);
+    if (entry) entry.labels.push(c.label);
+    else byKey.set(key, { labels: [c.label], segs: c.segs, total: c.total });
+  }
+  return [...byKey.values()].map(e => ({
+    label: e.labels.sort().join('/'),
+    segs: e.segs,
+    total: e.total,
+  }));
+}
 
-  for (const seg of segments) {
-    const label = classifyIntent(seg.name);
-    buckets.set(label, (buckets.get(label) ?? 0) + seg.total);
-    grand += seg.total;
+/**
+ * Discover composition facets from segment names. A facet is a set of mutually
+ * exclusive token-buckets that together cover most of the audience.
+ */
+export function discoverCompositionFacets(
+  segments: SegmentTotal[],
+  options: { maxFacets?: number } = {}
+): CompositionFacet[] {
+  const maxFacets = options.maxFacets ?? 3;
+  const n = segments.length;
+  if (n < 2) return [];
+
+  const grand = segments.reduce((s, seg) => s + seg.total, 0);
+  if (grand <= 0) return [];
+
+  const tokenSegs = new Map<string, Set<number>>();
+  segments.forEach((seg, i) => {
+    for (const t of facetTokens(seg.name)) {
+      const set = tokenSegs.get(t) ?? new Set<number>();
+      set.add(i);
+      tokenSegs.set(t, set);
+    }
+  });
+
+  // Candidate markers: present in ≥2 segments but not all (so they discriminate).
+  const candidates: FacetToken[] = [];
+  for (const [token, segs] of tokenSegs) {
+    if (segs.size < 2 || segs.size >= n) continue;
+    let total = 0;
+    for (const i of segs) total += segments[i]!.total;
+    candidates.push({ label: prettyToken(token), segs, total });
+  }
+  if (candidates.length === 0) return [];
+
+  const markers = mergeIdenticalTokens(candidates).sort(
+    (a, b) => b.total - a.total || a.label.localeCompare(b.label)
+  );
+
+  const used = new Set<string>();
+  const facets: CompositionFacet[] = [];
+
+  for (const seed of markers) {
+    if (used.has(seed.label)) continue;
+
+    // Greedily gather markers whose segments don't overlap → mutually exclusive.
+    const familySegs = new Set(seed.segs);
+    const members: FacetToken[] = [seed];
+    for (const cand of markers) {
+      if (cand.label === seed.label || used.has(cand.label)) continue;
+      if (isDisjoint(cand.segs, familySegs)) {
+        members.push(cand);
+        for (const i of cand.segs) familySegs.add(i);
+      }
+    }
+    if (members.length < 2) continue;
+
+    let buckets: CompositionBucket[] = members
+      .map(m => ({ label: m.label, total: m.total, share: share(m.total, grand) }))
+      .filter(b => b.share >= 0.02)
+      .sort((a, b) => b.total - a.total);
+    if (buckets.length < 2) continue;
+    if (buckets.length > 6) buckets = buckets.slice(0, 6);
+
+    const covered = buckets.reduce((s, b) => s + b.total, 0);
+    const coverage = share(covered, grand);
+    if (coverage < 0.6) continue;
+
+    const remainder = grand - covered;
+    if (share(remainder, grand) >= 0.03) {
+      buckets.push({ label: 'Other', total: remainder, share: share(remainder, grand) });
+    }
+
+    members.forEach(m => used.add(m.label));
+    facets.push({ id: members.map(m => m.label).join('|'), buckets, coverage });
+    if (facets.length >= maxFacets) break;
   }
 
-  if (buckets.size < 2) return [];
-
-  return orderBuckets(buckets, grand, ['In-market shoppers', 'Current owners', 'Service & finance']);
-}
-
-function classifyEthnicity(name: string): string {
-  const lower = name.toLowerCase();
-  if (/non[-\s]?hispanic/.test(lower)) return 'Non-Hispanic';
-  if (/hispanic/.test(lower)) return 'Hispanic';
-  return 'General';
-}
-
-function classifyIntent(name: string): string {
-  const lower = name.toLowerCase();
-  // Check service/finance first: a segment like "maintenance shoppers" reads as
-  // service even though the word "shoppers" appears.
-  if (/service|maintenance|credit|finance|refinance|loan|subprime/.test(lower)) {
-    return 'Service & finance';
-  }
-  if (/intender|shopper|in-?market|mover|pre-?owned/.test(lower)) return 'In-market shoppers';
-  if (/owner/.test(lower)) return 'Current owners';
-  return 'Other';
-}
-
-function orderBuckets(
-  buckets: Map<string, number>,
-  grand: number,
-  preferredOrder: string[]
-): CompositionBucket[] {
-  return Array.from(buckets.entries())
-    .map(([label, total]) => ({ label, total, share: share(total, grand) }))
-    .sort((a, b) => {
-      const ia = preferredOrder.indexOf(a.label);
-      const ib = preferredOrder.indexOf(b.label);
-      if (ia !== -1 && ib !== -1) return ia - ib;
-      if (ia !== -1) return -1;
-      if (ib !== -1) return 1;
-      return b.total - a.total;
-    });
+  return facets.sort((a, b) => b.coverage - a.coverage);
 }
 
 function mappableCompetitors(dealers: DealershipRow[]): { lat: number; lng: number }[] {
@@ -299,13 +386,40 @@ export function buildDashboardModel(input: DashboardInput): DashboardModel {
       }
     }
 
+    // Largest single segment within the radius — a real headcount that doesn't
+    // double-count people across segments, so it's safe to headline.
+    const inRadiusZips = new Set(Object.keys(inRadius));
+    const segInRadius = new Map<string, { total: number; zips: Set<string> }>();
+    for (const row of rows) {
+      if (!inRadiusZips.has(row.zip)) continue;
+      const entry = segInRadius.get(row.audience_type) ?? { total: 0, zips: new Set<string>() };
+      entry.total += row.audience_count;
+      if (row.audience_count > 0) entry.zips.add(row.zip);
+      segInRadius.set(row.audience_type, entry);
+    }
+    let leadSegment: SegmentTotal | null = null;
+    for (const [name, entry] of segInRadius) {
+      if (!leadSegment || entry.total > leadSegment.total) {
+        leadSegment = {
+          name,
+          total: entry.total,
+          zips: entry.zips.size,
+          share: share(entry.total, audienceInRadius),
+        };
+      }
+    }
+
+    const tradeConcentration = concentration(inRadius, audienceInRadius);
     tradeArea = {
       radiusMiles,
       audienceInRadius,
       zipsInRadius,
       share: share(audienceInRadius, totalAudience),
       centroidsResolved: centroidsResolved > 0,
-      topZips: rankZips(inRadius, audienceInRadius, 8),
+      topZips: tradeConcentration.topZips,
+      top5Share: tradeConcentration.top5Share,
+      zipsForHalf: tradeConcentration.zipsForHalf,
+      leadSegment,
     };
   }
 
@@ -333,8 +447,7 @@ export function buildDashboardModel(input: DashboardInput): DashboardModel {
     segmentCount: segments.length,
     segments,
     topSegment: segments[0] ?? null,
-    ethnicity: ethnicityComposition(segments),
-    intent: intentComposition(segments),
+    composition: discoverCompositionFacets(segments),
     concentration: concentration(byZip, totalAudience),
     tradeArea,
     competitive: {

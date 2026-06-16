@@ -153,7 +153,11 @@ function parseLongFormat(
       return;
     }
 
-    addRecord(aggregated, zip, audienceType, count);
+    // Skip zero/blank counts so a ZIP only registers when it has audience —
+    // matching the wide-format path, so behavior is identical across shapes.
+    if (count > 0) {
+      addRecord(aggregated, zip, audienceType, count);
+    }
   });
 
   const summary = buildSummary(fileName, rawRows.length, aggregated, invalid, 'long');

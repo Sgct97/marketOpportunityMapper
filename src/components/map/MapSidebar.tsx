@@ -106,10 +106,7 @@ export function MapSidebar({
   const scoped = marketAnalysis?.topZipsScope === 'trade-area';
 
   return (
-    <aside
-      className="mom-scroll w-full lg:w-[372px] shrink-0 border-l border-[var(--line)] flex flex-col max-h-[52vh] lg:max-h-none lg:h-full overflow-y-auto backdrop-blur-xl"
-      style={{ background: 'linear-gradient(180deg, rgba(12,18,32,0.78), rgba(7,11,21,0.86))' }}
-    >
+    <aside className="mom-panel mom-scroll w-full lg:w-[372px] shrink-0 border-l border-[var(--line)] flex flex-col max-h-[52vh] lg:max-h-none lg:h-full overflow-y-auto">
       <div className="px-6 pt-5 pb-4 border-b border-[var(--line-soft)]">
         <h2 className="mom-eyebrow">Map controls</h2>
         {datasetLabel && (
@@ -152,7 +149,7 @@ export function MapSidebar({
           <select
             value={focusDealershipId ?? ''}
             onChange={e => onFocusDealership(e.target.value)}
-            className="w-full rounded-lg border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-[13px] text-[var(--ink)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+            className="w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-[13px] text-[var(--ink)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
           >
             {clientDealerships.map(d => (
               <option key={d.id} value={d.id}>

@@ -7,7 +7,7 @@ import { aggregateAudienceByZip } from '@/lib/audience/aggregate';
 import type { AudienceZipRow } from '@/lib/audience/aggregate';
 import type { DealershipRow } from '@/lib/dealership/types';
 import type { RadiusMiles } from '@/lib/projects/settings';
-import { resolveBasemapStyles } from '@/lib/map/basemap';
+import { resolveBasemapStyles, type MapTheme } from '@/lib/map/basemap';
 import { choroplethFillPaint, choroplethLinePaint } from '@/lib/map/choropleth';
 import { hexToRgb } from '@/lib/map/colors';
 import { fetchZipBoundaries } from '@/lib/map/boundaries';
@@ -22,8 +22,6 @@ import {
 import { dealershipPopupHtml } from '@/lib/map/dealership-popup';
 import { mergeAudienceIntoBoundaries } from '@/lib/map/geojson';
 import { audiencePopupHtml } from '@/lib/map/popup';
-
-const MAP_STYLES = resolveBasemapStyles();
 
 interface Props {
   rows: AudienceZipRow[];
@@ -40,12 +38,15 @@ interface Props {
   onFocusDealership: (id: string) => void;
   /** When false the map is hidden (e.g. dashboard view); resize on re-show. */
   active?: boolean;
+  /** Presentation theme — drives basemap + outline contrast. */
+  theme?: MapTheme;
 }
 
 function ensureZipLayers(
   map: maplibregl.Map,
   rgb: ReturnType<typeof hexToRgb>,
-  maxCount: number
+  maxCount: number,
+  theme: MapTheme
 ) {
   if (!map.getSource('zip-areas')) {
     map.addSource('zip-areas', {
@@ -69,7 +70,7 @@ function ensureZipLayers(
       id: 'zip-outline',
       type: 'line',
       source: 'zip-areas',
-      paint: choroplethLinePaint(rgb),
+      paint: choroplethLinePaint(rgb, theme),
     });
   }
 }
@@ -77,7 +78,8 @@ function ensureZipLayers(
 function applyChoroplethPaint(
   map: maplibregl.Map,
   rgb: ReturnType<typeof hexToRgb>,
-  maxCount: number
+  maxCount: number,
+  theme: MapTheme
 ) {
   if (map.getLayer('zip-fill')) {
     const fill = choroplethFillPaint(rgb, maxCount);
@@ -91,7 +93,7 @@ function applyChoroplethPaint(
     }
   }
   if (map.getLayer('zip-outline')) {
-    const line = choroplethLinePaint(rgb);
+    const line = choroplethLinePaint(rgb, theme);
     if (line) {
       if (line['line-color'] != null) map.setPaintProperty('zip-outline', 'line-color', line['line-color']);
       if (line['line-width'] != null) map.setPaintProperty('zip-outline', 'line-width', line['line-width']);
@@ -135,6 +137,7 @@ export function OpportunityMap({
   showRadiusLayer,
   onFocusDealership,
   active = true,
+  theme = 'dark',
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -172,6 +175,7 @@ export function OpportunityMap({
   const displayedFeatureCount = isEmptySelection ? 0 : featureCount;
 
   const rgb = useMemo(() => hexToRgb(primaryColor), [primaryColor]);
+  const mapStyles = useMemo(() => resolveBasemapStyles(theme), [theme]);
 
   const clearHoverState = useCallback((map: maplibregl.Map) => {
     const id = hoveredFeatureIdRef.current;
@@ -274,7 +278,7 @@ export function OpportunityMap({
 
     const initLayers = (map: maplibregl.Map) => {
       if (cancelled) return;
-      ensureZipLayers(map, rgb, aggregate.maxCount || 1);
+      ensureZipLayers(map, rgb, aggregate.maxCount || 1, theme);
       ensureDealershipLayers(map, primaryColor);
       bindHoverHandlers(map);
       bindDealershipHandlers(map);
@@ -316,9 +320,9 @@ export function OpportunityMap({
         if (cancelled) return;
         const message = e.error?.message ?? '';
         if (message.includes('Failed to load') || message.includes('style')) {
-          if (styleIndex < MAP_STYLES.length - 1) {
+          if (styleIndex < mapStyles.length - 1) {
             styleIndex += 1;
-            map.setStyle(MAP_STYLES[styleIndex]!);
+            map.setStyle(mapStyles[styleIndex]!);
             map.once('load', onStyleReady);
             return;
           }
@@ -329,7 +333,7 @@ export function OpportunityMap({
       mapRef.current = map;
     };
 
-    attachMap(MAP_STYLES[0]!);
+    attachMap(mapStyles[0]!);
 
     return () => {
       cancelled = true;
@@ -343,7 +347,7 @@ export function OpportunityMap({
       setLayersReady(false);
       setFeatureCount(0);
     };
-  }, [rgb, bindHoverHandlers, bindDealershipHandlers, aggregate.maxCount, primaryColor]);
+  }, [rgb, bindHoverHandlers, bindDealershipHandlers, aggregate.maxCount, primaryColor, mapStyles, theme]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -418,8 +422,8 @@ export function OpportunityMap({
         if (!mapInstance || controller.signal.aborted) return;
 
         const max = aggregate.maxCount || 1;
-        ensureZipLayers(mapInstance, rgb, max);
-        applyChoroplethPaint(mapInstance, rgb, max);
+        ensureZipLayers(mapInstance, rgb, max, theme);
+        applyChoroplethPaint(mapInstance, rgb, max, theme);
 
         const merged = mergeAudienceIntoBoundaries(
           data as FeatureCollection<Geometry, { ZCTA5?: string }>,
@@ -473,14 +477,21 @@ export function OpportunityMap({
     typeLabel,
     rgb,
     focusDealershipId,
+    theme,
   ]);
 
   return (
-    <div className="relative flex-1 min-h-[400px] w-full bg-[#070b15] mom-map-shell">
+    <div
+      className="relative flex-1 min-h-[400px] w-full mom-map-shell"
+      style={{ background: 'var(--map-backdrop)' }}
+    >
       <div ref={containerRef} className="absolute inset-0 w-full h-full" />
 
       {!layersReady && !mapError && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-[#070b15]">
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          style={{ background: 'var(--map-backdrop)' }}
+        >
           <p className="text-sm text-[var(--muted)] tracking-wide">Loading map…</p>
         </div>
       )}
@@ -492,13 +503,13 @@ export function OpportunityMap({
       )}
 
       {mapError && (
-        <div className="absolute top-4 left-4 right-4 z-10 max-w-md rounded-lg bg-[rgba(60,15,20,0.85)] border border-[rgba(255,120,120,0.35)] px-4 py-2.5 text-xs text-[#FCA5A5] backdrop-blur-md">
+        <div className="mom-alert absolute top-4 left-4 right-4 z-10 max-w-md px-4 py-2.5 text-xs">
           {mapError}
         </div>
       )}
 
       {boundaryError && (
-        <div className="absolute top-14 left-4 right-4 z-10 max-w-md rounded-lg bg-[rgba(60,15,20,0.85)] border border-[rgba(255,120,120,0.35)] px-4 py-2.5 text-xs text-[#FCA5A5] backdrop-blur-md">
+        <div className="mom-alert absolute top-14 left-4 right-4 z-10 max-w-md px-4 py-2.5 text-xs">
           {boundaryError}
         </div>
       )}
@@ -516,7 +527,10 @@ export function OpportunityMap({
       )}
 
       {isEmptySelection && selectedTypes.length === 0 && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#070b15]/80 backdrop-blur-[2px] pointer-events-none">
+        <div
+          className="absolute inset-0 z-10 flex items-center justify-center backdrop-blur-[2px] pointer-events-none"
+          style={{ background: 'var(--map-veil)' }}
+        >
           <p className="text-sm text-[var(--muted)]">Select at least one audience segment</p>
         </div>
       )}

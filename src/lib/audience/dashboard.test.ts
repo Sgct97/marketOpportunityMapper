@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildDashboardModel,
-  ethnicityComposition,
-  intentComposition,
+  discoverCompositionFacets,
+  facetTokens,
   segmentTotals,
   totalsByZip,
 } from './dashboard';
@@ -44,29 +44,69 @@ describe('totalsByZip', () => {
   });
 });
 
-describe('ethnicityComposition', () => {
-  it('splits Hispanic vs Non-Hispanic when both present', () => {
-    const comp = ethnicityComposition(segmentTotals(rows));
-    expect(comp.map(c => c.label)).toEqual(['Hispanic', 'Non-Hispanic']);
-    expect(comp[0]?.total).toBe(850);
-    expect(comp[1]?.total).toBe(700);
+describe('facetTokens', () => {
+  it('keeps "non-hispanic" distinct from "hispanic"', () => {
+    expect(facetTokens('Non- Hispanic HYUNDAI/KIA Owners')).toContain('non-hispanic');
+    expect(facetTokens('Non- Hispanic HYUNDAI/KIA Owners')).not.toContain('hispanic');
+    expect(facetTokens('Hispanic HYUNDAI/KIA Intenders')).toContain('hispanic');
   });
 
-  it('returns empty when the split is not present', () => {
-    const single = segmentTotals([
-      { zip: '1', audience_type: 'EV Shoppers', audience_count: 10 },
-    ]);
-    expect(ethnicityComposition(single)).toEqual([]);
+  it('splits slash-joined brands and drops filler words', () => {
+    const tokens = facetTokens('Hispanic all other ASIAN IMPORT owners');
+    expect(tokens).toContain('asian');
+    expect(tokens).toContain('import');
+    expect(tokens).not.toContain('all');
+    expect(tokens).not.toContain('other');
   });
 });
 
-describe('intentComposition', () => {
-  it('groups into shoppers / owners / service', () => {
-    const comp = intentComposition(segmentTotals(rows));
-    const byLabel = Object.fromEntries(comp.map(c => [c.label, c.total]));
-    expect(byLabel['In-market shoppers']).toBe(850);
-    expect(byLabel['Current owners']).toBe(500);
-    expect(byLabel['Service & finance']).toBe(200);
+const fontanaLike = segmentTotals([
+  { zip: '1', audience_type: 'Hispanic HYUNDAI/KIA Intenders', audience_count: 600 },
+  { zip: '1', audience_type: 'Hispanic HYUNDAI/KIA Owners', audience_count: 300 },
+  { zip: '1', audience_type: 'Non-Hispanic HYUNDAI/KIA Intenders', audience_count: 250 },
+  { zip: '1', audience_type: 'Non-Hispanic HYUNDAI/KIA Owners', audience_count: 350 },
+]);
+
+describe('discoverCompositionFacets', () => {
+  it('auto-discovers the Hispanic / Non-Hispanic split from segment names', () => {
+    const facets = discoverCompositionFacets(fontanaLike);
+    const labels = facets.flatMap(f => f.buckets.map(b => b.label));
+    expect(labels).toContain('Hispanic');
+    expect(labels).toContain('Non-Hispanic');
+    // It should also discover the Owners / Intenders lifecycle split.
+    expect(labels).toContain('Owners');
+    expect(labels).toContain('Intenders');
+  });
+
+  it('adapts to a different file (vehicle interest + ethnicity)', () => {
+    const segs = segmentTotals([
+      { zip: '1', audience_type: 'Hispanic EV Shoppers', audience_count: 300 },
+      { zip: '1', audience_type: 'Non-Hispanic EV Shoppers', audience_count: 200 },
+      { zip: '1', audience_type: 'Hispanic Luxury Owners', audience_count: 150 },
+      { zip: '1', audience_type: 'Non-Hispanic Luxury Owners', audience_count: 150 },
+    ]);
+    const facets = discoverCompositionFacets(segs);
+    // Should find two clean splits: EV/Shoppers vs Luxury/Owners, and ethnicity.
+    expect(facets.length).toBeGreaterThanOrEqual(2);
+    const allLabels = facets.flatMap(f => f.buckets.map(b => b.label));
+    expect(allLabels).toContain('Hispanic');
+    expect(allLabels.some(l => l.includes('Luxury'))).toBe(true);
+  });
+
+  it('returns nothing when names share no recurring words', () => {
+    const segs = segmentTotals([
+      { zip: '1', audience_type: 'EV Shoppers', audience_count: 10 },
+      { zip: '1', audience_type: 'Luxury Owners', audience_count: 10 },
+    ]);
+    expect(discoverCompositionFacets(segs)).toEqual([]);
+  });
+
+  it('keeps buckets within a facet mutually exclusive (shares sum ≤ 1)', () => {
+    const facets = discoverCompositionFacets(fontanaLike);
+    for (const facet of facets) {
+      const sum = facet.buckets.reduce((s, b) => s + b.share, 0);
+      expect(sum).toBeLessThanOrEqual(1.0001);
+    }
   });
 });
 
@@ -120,6 +160,13 @@ describe('buildDashboardModel', () => {
     expect(model.tradeArea?.zipsInRadius).toBe(2);
     expect(model.tradeArea?.share).toBeCloseTo(1500 / 1550, 5);
     expect(model.tradeArea?.topZips.some(z => z.zip === '90001')).toBe(false);
+    // Concentration is computed within the trade area (92336=1200, 91739=300).
+    expect(model.tradeArea?.top5Share).toBeCloseTo(1, 5);
+    expect(model.tradeArea?.zipsForHalf).toBe(1);
+    // Lead segment is the largest single segment among in-radius ZIPs.
+    expect(model.tradeArea?.leadSegment?.name).toBe('Hispanic HYUNDAI/KIA Intenders');
+    expect(model.tradeArea?.leadSegment?.total).toBe(800);
+    expect(model.tradeArea?.leadSegment?.share).toBeCloseTo(800 / 1500, 5);
   });
 
   it('reports competitors and finds white space away from rivals', () => {

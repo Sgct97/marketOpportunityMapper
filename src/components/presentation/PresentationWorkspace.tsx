@@ -26,7 +26,13 @@ import {
 import { saveProjectMapSettings } from '@/app/actions/project-settings';
 import { MapView } from '@/components/map/MapView';
 import { DashboardView } from '@/components/dashboard/DashboardView';
-import { PresentationHeader, type PresentationView } from './PresentationHeader';
+import {
+  PresentationHeader,
+  type PresentationTheme,
+  type PresentationView,
+} from './PresentationHeader';
+
+const THEME_STORAGE_KEY = 'mom-presentation-theme';
 
 interface Props {
   projectId: string;
@@ -66,6 +72,22 @@ export function PresentationWorkspace({
   const clientOptions = useMemo(() => clientDealerships(dealerships), [dealerships]);
 
   const [view, setView] = useState<PresentationView>('map');
+  // Default to dark on both server and first client render to avoid a hydration
+  // mismatch; the saved preference is applied in an effect after mount.
+  const [theme, setTheme] = useState<PresentationTheme>('dark');
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === 'light' || saved === 'dark') setTheme(saved);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      window.localStorage.setItem(THEME_STORAGE_KEY, next);
+      return next;
+    });
+  }, []);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(() => listAudienceTypes(rows));
   const [focusDealershipId, setFocusDealershipId] = useState<string | null>(
     () => resolveInitialFocus(dealerships, parsed)
@@ -207,21 +229,27 @@ export function PresentationWorkspace({
     ? `${focusDealership.name} · ${radiusMiles} mi radius`
     : datasetLabel;
 
-  // The presentation surface is dark, so the visible accent is the brand's
-  // luminous `glow`; `--accent-strong` keeps the true brand hue for the
-  // monogram / solid identity marks.
-  const accentVars = {
-    ['--accent']: brand.glow,
-    ['--accent-strong']: brand.primaryColor,
-    ['--accent-deep']: brand.glowDeep,
-    ['--accent-dark']: brand.primaryColor,
-    ['--accent-soft']: brand.glowSoft,
-    ['--accent-line']: brand.glowLine,
-    ['--on-accent']: brand.onPrimary,
+  // Expose the brand palette as CSS vars; the active theme (`.mom-canvas` /
+  // `[data-theme="light"]`) maps these to `--accent` etc. On dark the accent is
+  // the luminous `glow`; on light it's the true brand hue.
+  const brandVars = {
+    ['--brand-primary']: brand.primaryColor,
+    ['--brand-primary-dark']: brand.primaryDark,
+    ['--brand-primary-soft']: brand.primarySoft,
+    ['--brand-primary-line']: brand.primaryLine,
+    ['--brand-glow']: brand.glow,
+    ['--brand-glow-deep']: brand.glowDeep,
+    ['--brand-glow-soft']: brand.glowSoft,
+    ['--brand-glow-line']: brand.glowLine,
+    ['--brand-on']: brand.onPrimary,
   } as React.CSSProperties;
 
+  // Data-viz accent that reads on the active surface (map choropleth/pins,
+  // dashboard charts): luminous glow on dark, true brand hue on light.
+  const accentColor = theme === 'light' ? brand.primaryColor : brand.glow;
+
   return (
-    <div className="mom-canvas flex flex-col h-screen" style={accentVars}>
+    <div className="mom-canvas flex flex-col h-screen" data-theme={theme} style={brandVars}>
       <PresentationHeader
         projectId={projectId}
         projectName={projectName}
@@ -229,15 +257,18 @@ export function PresentationWorkspace({
         view={view}
         onViewChange={setView}
         contextLabel={contextLabel}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       <div className="flex flex-1 min-h-0">
         <div className={`flex-1 min-h-0 ${view === 'map' ? 'flex' : 'hidden'}`}>
           <MapView
             active={view === 'map'}
+            theme={theme}
             rows={rows}
             selectedTypes={selectedTypes}
-            primaryColor={brand.glow}
+            primaryColor={accentColor}
             typeLabel={typeLabel}
             dealerships={dealerships}
             focusDealershipId={focusDealershipId}
@@ -285,7 +316,7 @@ export function PresentationWorkspace({
           <div className="flex flex-1 min-h-0">
             <DashboardView
               model={dashboardModel}
-              glow={brand.glow}
+              glow={accentColor}
               brandName={brand.name}
               datasetLabel={datasetLabel}
               focusName={focusDealership?.name ?? null}

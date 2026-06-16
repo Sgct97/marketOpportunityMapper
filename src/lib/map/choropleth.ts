@@ -38,14 +38,19 @@ export function choroplethFillPaint(
   };
 }
 
-export function choroplethLinePaint(rgb: Rgb): LineLayerSpecification['paint'] {
+export function choroplethLinePaint(
+  rgb: Rgb,
+  theme: 'dark' | 'light' = 'dark'
+): LineLayerSpecification['paint'] {
   const [r, g, b] = rgb;
+  const restColor =
+    theme === 'light' ? 'rgba(15, 23, 42, 0.18)' : 'rgba(255, 255, 255, 0.16)';
   return {
     'line-color': [
       'case',
       ['boolean', ['feature-state', 'hover'], false],
       `rgb(${r},${g},${b})`,
-      'rgba(255, 255, 255, 0.16)',
+      restColor,
     ],
     'line-width': [
       'case',

@@ -49,6 +49,19 @@ describe('validateAudienceRows — long format', () => {
     );
     expect(records[0]!.audienceCount).toBe(150);
   });
+
+  it('skips zero/blank counts so empty ZIPs are excluded (matches wide format)', () => {
+    const { records, summary } = validateAudienceRows(
+      [
+        validRow,
+        { 'ZIP Code': '75070', 'Audience Type': 'Nissan Owners', 'Audience Count': '0' },
+        { 'ZIP Code': '75071', 'Audience Type': 'EV Shoppers', 'Audience Count': '' },
+      ],
+      'test.csv'
+    );
+    expect(summary.zips).toEqual(['75067']);
+    expect(records).toHaveLength(1);
+  });
 });
 
 describe('validateAudienceRows — wide format', () => {

@@ -20,6 +20,8 @@ export interface BrandConfig {
   primaryDark: string;
   /** Soft tint for fills / chip backgrounds (rgba string). */
   primarySoft: string;
+  /** Translucent primary for hairline borders on light surfaces (rgba). */
+  primaryLine: string;
   /**
    * Luminous, on-dark accent. The presentation surface is dark, so most brand
    * hues (Hyundai navy, Subaru blue …) would vanish. `glow` is the brightened,
@@ -156,6 +158,7 @@ function buildBrand(id: string, name: string, accent: OemAccent): BrandConfig {
     primaryColor: primary,
     primaryDark: shade(primary, -0.22),
     primarySoft: rgba(primary, 0.1),
+    primaryLine: rgba(primary, 0.38),
     glow,
     glowDeep: shade(glow, -0.3),
     glowSoft: rgba(glow, 0.14),
