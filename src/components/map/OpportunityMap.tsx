@@ -42,6 +42,54 @@ interface Props {
   theme?: MapTheme;
 }
 
+/**
+ * Id of the first settlement-label (place_*) layer. Inserting the choropleth
+ * before it puts the colored overlay ABOVE roads/buildings (so road lines stop
+ * dominating the map) while keeping town & city names rendering on top, where
+ * they stay legible. Falls back to the first symbol layer, then to the top.
+ */
+function placeLabelBeforeId(map: maplibregl.Map): string | undefined {
+  const layers = map.getStyle().layers ?? [];
+  const place = layers.find(
+    l => l.type === 'symbol' && l.id.startsWith('place')
+  );
+  if (place) return place.id;
+  return layers.find(l => l.type === 'symbol')?.id;
+}
+
+/**
+ * Make the basemap's town/city labels read clearly above the colored overlay:
+ * a wider, theme-appropriate halo plus a small size bump, and tone the road
+ * lines down so geography doesn't compete with the audience heat.
+ */
+function tuneBasemapLegibility(map: maplibregl.Map, theme: MapTheme) {
+  const layers = map.getStyle().layers ?? [];
+  const haloColor = theme === 'light' ? '#ffffff' : 'rgba(8, 13, 24, 0.92)';
+  const textColor = theme === 'light' ? '#0f172a' : '#f1f5f9';
+
+  for (const layer of layers) {
+    if (layer.type === 'symbol' && layer.id.startsWith('place')) {
+      try {
+        map.setPaintProperty(layer.id, 'text-halo-color', haloColor);
+        map.setPaintProperty(layer.id, 'text-halo-width', 1.8);
+        map.setPaintProperty(layer.id, 'text-halo-blur', 0.4);
+        map.setPaintProperty(layer.id, 'text-color', textColor);
+      } catch {
+        // Layer may lack a text symbol; ignore.
+      }
+    } else if (
+      layer.type === 'line' &&
+      (layer.id.startsWith('road') || layer.id.startsWith('bridge') || layer.id.startsWith('tunnel'))
+    ) {
+      try {
+        map.setPaintProperty(layer.id, 'line-opacity', theme === 'light' ? 0.45 : 0.5);
+      } catch {
+        // Some line layers don't expose opacity; ignore.
+      }
+    }
+  }
+}
+
 function ensureZipLayers(
   map: maplibregl.Map,
   rgb: ReturnType<typeof hexToRgb>,
@@ -56,22 +104,30 @@ function ensureZipLayers(
     });
   }
 
+  const beforeId = placeLabelBeforeId(map);
+
   if (!map.getLayer('zip-fill')) {
-    map.addLayer({
-      id: 'zip-fill',
-      type: 'fill',
-      source: 'zip-areas',
-      paint: choroplethFillPaint(rgb, maxCount),
-    });
+    map.addLayer(
+      {
+        id: 'zip-fill',
+        type: 'fill',
+        source: 'zip-areas',
+        paint: choroplethFillPaint(rgb, maxCount),
+      },
+      beforeId
+    );
   }
 
   if (!map.getLayer('zip-outline')) {
-    map.addLayer({
-      id: 'zip-outline',
-      type: 'line',
-      source: 'zip-areas',
-      paint: choroplethLinePaint(rgb, theme),
-    });
+    map.addLayer(
+      {
+        id: 'zip-outline',
+        type: 'line',
+        source: 'zip-areas',
+        paint: choroplethLinePaint(rgb, theme),
+      },
+      beforeId
+    );
   }
 }
 
@@ -278,6 +334,7 @@ export function OpportunityMap({
 
     const initLayers = (map: maplibregl.Map) => {
       if (cancelled) return;
+      tuneBasemapLegibility(map, theme);
       ensureZipLayers(map, rgb, aggregate.maxCount || 1, theme);
       ensureDealershipLayers(map, primaryColor);
       bindHoverHandlers(map);

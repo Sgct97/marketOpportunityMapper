@@ -16,23 +16,24 @@ export function choroplethFillPaint(
   }
 
   const m = maxCount;
-  // Tuned for a dark basemap: the low end stays visible and the high end
-  // reads as a luminous "heat" without washing out to a flat block.
+  // The choropleth renders BENEATH the basemap labels, so place names stay
+  // legible. Alphas are kept moderate so roads/geography still read through
+  // the heat instead of flattening into a solid block.
   return {
     'fill-color': [
       'interpolate',
       ['linear'],
       ['get', 'audienceCount'],
       1,
-      ['rgba', r, g, b, 0.16],
+      ['rgba', r, g, b, 0.12],
       m * 0.2,
-      ['rgba', r, g, b, 0.32],
+      ['rgba', r, g, b, 0.26],
       m * 0.45,
-      ['rgba', r, g, b, 0.5],
+      ['rgba', r, g, b, 0.42],
       m * 0.7,
-      ['rgba', r, g, b, 0.68],
+      ['rgba', r, g, b, 0.58],
       m,
-      ['rgba', r, g, b, 0.9],
+      ['rgba', r, g, b, 0.74],
     ],
     'fill-opacity': 1,
   };
