@@ -22,7 +22,7 @@ export default async function HomePage() {
   return (
     <PageChrome
       title="Market Opportunity Mapper"
-      note={isAuthDisabled() ? 'Auth off (local dev)' : undefined}
+      note={isAuthDisabled() ? 'Auth off' : undefined}
     >
       <main className="max-w-4xl mx-auto px-6 py-10 mom-fade-up">
         <p className="mom-eyebrow">Projects</p>

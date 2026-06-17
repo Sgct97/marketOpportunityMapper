@@ -1,4 +1,8 @@
-/** Local dev only — set DISABLE_AUTH=true in .env.local. Never on production. */
+/**
+ * Skip Supabase login and act as the dev user (service role + dev@local.test).
+ * Set DISABLE_AUTH=true in .env.local or on Render for internal/demo deployments.
+ * Leave unset on any public-facing production URL.
+ */
 export function isAuthDisabled(): boolean {
-  return process.env.NODE_ENV === 'development' && process.env.DISABLE_AUTH === 'true';
+  return process.env.DISABLE_AUTH === 'true';
 }
