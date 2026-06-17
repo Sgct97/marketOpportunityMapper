@@ -3,7 +3,7 @@
 import { legendStops } from '@/lib/audience/aggregate';
 import type { MarketAnalysis } from '@/lib/audience/market-analysis';
 import type { DealershipRow } from '@/lib/dealership/types';
-import type { RadiusMiles } from '@/lib/projects/settings';
+import type { AccentSource, RadiusMiles } from '@/lib/projects/settings';
 import { fillColor, hexToRgb } from '@/lib/map/colors';
 import { formatNumber, formatPercent } from '@/lib/format';
 
@@ -26,6 +26,10 @@ interface Props {
   radiusMiles: RadiusMiles;
   radiusOptions: readonly RadiusMiles[];
   onRadiusChange: (miles: RadiusMiles) => void;
+  accentSource: AccentSource;
+  onAccentSourceChange: (source: AccentSource) => void;
+  vehicleBrandName: string;
+  agencyBrandName: string;
   showZipLayer: boolean;
   showClientDealershipLayer: boolean;
   showCompetitorLayer: boolean;
@@ -105,6 +109,10 @@ export function MapSidebar({
   radiusMiles,
   radiusOptions,
   onRadiusChange,
+  accentSource,
+  onAccentSourceChange,
+  vehicleBrandName,
+  agencyBrandName,
   showZipLayer,
   showClientDealershipLayer,
   showCompetitorLayer,
@@ -143,6 +151,43 @@ export function MapSidebar({
             {datasetLabel}
           </p>
         )}
+      </div>
+
+      <div className="px-6 py-4 border-b border-[var(--line-soft)]">
+        <p className="mom-eyebrow mb-2.5">Brand palette</p>
+        <div className="grid grid-cols-2 gap-2">
+          {([
+            { id: 'vehicle', label: vehicleBrandName, sub: 'Vehicle brand' },
+            { id: 'agency', label: agencyBrandName, sub: 'Agency brand' },
+          ] as const).map(opt => {
+            const active = accentSource === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => onAccentSourceChange(opt.id)}
+                data-active={active}
+                className="rounded-lg border px-3 py-2.5 text-left transition-colors data-[active=true]:border-[var(--accent)] data-[active=true]:bg-[var(--accent-soft)] border-[var(--line)] hover:border-[var(--faint)]"
+              >
+                <span className="block text-[10px] uppercase tracking-wide text-[var(--faint)]">
+                  {opt.sub}
+                </span>
+                <span className="mt-0.5 flex items-center gap-1.5 text-[13px] font-semibold text-[var(--ink)]">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ background: active ? 'var(--accent)' : 'var(--faint)' }}
+                  />
+                  <span className="truncate" title={opt.label}>
+                    {opt.label}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-[11px] text-[var(--faint)]">
+          Recolors the map, dashboard, and exported report.
+        </p>
       </div>
 
       <div className="px-6 py-4 border-b border-[var(--line-soft)]">

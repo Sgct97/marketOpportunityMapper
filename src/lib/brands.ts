@@ -1,3 +1,4 @@
+import type { AgencyBrandConfig } from '@/lib/agency-brand';
 import { detectBrand } from '@/lib/dealership/infer-client';
 
 /**
@@ -122,6 +123,17 @@ export function resolveBrandAccent(input: ResolveBrandInput): BrandConfig {
   }
 
   return defaultBrand;
+}
+
+/**
+ * Build a presentation accent from an agency palette so the live UI and PDF can
+ * be driven by the agency's own colors instead of the vehicle OEM accent.
+ */
+export function agencyAccent(agency: AgencyBrandConfig): BrandConfig {
+  return buildBrand(agency.id, agency.name, {
+    primary: agency.primaryColor,
+    glow: agency.glow,
+  });
 }
 
 /** Back-compat: legacy lookup by stored brand id. */

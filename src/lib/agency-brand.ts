@@ -12,6 +12,8 @@ export interface AgencyBrandConfig {
   /** Image format of the logo file, for jsPDF `addImage`. */
   logoFormat: 'PNG' | 'JPEG';
   primaryColor: string;
+  /** Luminous companion of `primaryColor` that reads on the dark live canvas. */
+  glow: string;
   secondaryColor: string;
   textColor: string;
   headerBackgroundColor?: string;
@@ -25,6 +27,7 @@ export const agencyBrands: Record<string, AgencyBrandConfig> = {
     logoAspect: 746 / 208,
     logoFormat: 'PNG',
     primaryColor: '#4BA5A5',
+    glow: '#2DE0C8',
     secondaryColor: '#5A5A5A',
     textColor: '#333333',
   },
@@ -35,6 +38,7 @@ export const agencyBrands: Record<string, AgencyBrandConfig> = {
     logoAspect: 1024 / 248,
     logoFormat: 'JPEG',
     primaryColor: '#C91F2C',
+    glow: '#FF4D5E',
     secondaryColor: '#1D3F8F',
     textColor: '#1A202C',
     headerBackgroundColor: '#101827',

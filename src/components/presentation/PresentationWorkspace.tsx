@@ -14,13 +14,15 @@ import {
   competitorDealerships,
 } from '@/lib/dealership/filter';
 import type { DealershipRow } from '@/lib/dealership/types';
-import { resolveBrandAccent } from '@/lib/brands';
+import { agencyAccent, resolveBrandAccent } from '@/lib/brands';
+import { getAgencyBrand } from '@/lib/agency-brand';
 import { fetchZipBoundaries } from '@/lib/map/boundaries';
 import { centroidsFromBoundaries } from '@/lib/map/centroids';
 import type { LatLng } from '@/lib/map/centroids';
 import {
   parseProjectMapSettings,
   RADIUS_MILES_OPTIONS,
+  type AccentSource,
   type ProjectMapSettings,
   type RadiusMiles,
 } from '@/lib/projects/settings';
@@ -104,6 +106,7 @@ export function PresentationWorkspace({
     () => resolveInitialFocus(dealerships, parsed)
   );
   const [radiusMiles, setRadiusMiles] = useState<RadiusMiles>(parsed.radiusMiles ?? 25);
+  const [accentSource, setAccentSource] = useState<AccentSource>(parsed.accentSource ?? 'vehicle');
   const [showZipLayer, setShowZipLayer] = useState(parsed.showZipLayer !== false);
   const [showClientDealershipLayer, setShowClientDealershipLayer] = useState(
     parsed.showClientDealershipLayer !== false
@@ -120,7 +123,8 @@ export function PresentationWorkspace({
 
   const clientBrand = focusDealership?.brand ?? clientOptions[0]?.brand ?? null;
 
-  const brand = useMemo(
+  // The vehicle (OEM) accent, resolved from the strongest brand signal.
+  const vehicleBrand = useMemo(
     () =>
       resolveBrandAccent({
         brandId,
@@ -131,6 +135,13 @@ export function PresentationWorkspace({
       }),
     [brandId, clientBrand, datasetLabel, projectName, audienceTypes]
   );
+
+  // The agency accent (e.g. Dealer Media House teal), built from its palette.
+  const agencyBrandConfig = useMemo(() => getAgencyBrand(brandId), [brandId]);
+  const agencyBrand = useMemo(() => agencyAccent(agencyBrandConfig), [agencyBrandConfig]);
+
+  // The active accent flows through CSS tokens (map + dashboard) and the PDF.
+  const brand = accentSource === 'agency' ? agencyBrand : vehicleBrand;
 
   const aggregate = useMemo(
     () => aggregateAudienceByZip(rows, selectedTypes),
@@ -302,6 +313,11 @@ export function PresentationWorkspace({
     persistSettings({ radiusMiles: miles });
   }
 
+  function handleAccentSourceChange(source: AccentSource) {
+    setAccentSource(source);
+    persistSettings({ accentSource: source });
+  }
+
   const contextLabel = focusDealership
     ? `${focusDealership.name} · ${radiusMiles} mi radius`
     : datasetLabel;
@@ -370,6 +386,10 @@ export function PresentationWorkspace({
             clientDealerships={clientOptions}
             radiusOptions={RADIUS_MILES_OPTIONS}
             onRadiusChange={handleRadiusChange}
+            accentSource={accentSource}
+            onAccentSourceChange={handleAccentSourceChange}
+            vehicleBrandName={vehicleBrand.name}
+            agencyBrandName={agencyBrand.name}
             onToggleZipLayer={v => {
               setShowZipLayer(v);
               persistSettings({ showZipLayer: v });

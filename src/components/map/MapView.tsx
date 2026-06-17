@@ -7,7 +7,7 @@ import type { AudienceZipRow } from '@/lib/audience/aggregate';
 import type { MarketAnalysis } from '@/lib/audience/market-analysis';
 import type { MapTheme } from '@/lib/map/basemap';
 import type { DealershipRow } from '@/lib/dealership/types';
-import type { RadiusMiles } from '@/lib/projects/settings';
+import type { AccentSource, RadiusMiles } from '@/lib/projects/settings';
 import { MapSidebar } from './MapSidebar';
 
 const OpportunityMap = dynamic(
@@ -51,6 +51,10 @@ interface Props {
   clientDealerships: DealershipRow[];
   radiusOptions: readonly RadiusMiles[];
   onRadiusChange: (miles: RadiusMiles) => void;
+  accentSource: AccentSource;
+  onAccentSourceChange: (source: AccentSource) => void;
+  vehicleBrandName: string;
+  agencyBrandName: string;
   onToggleZipLayer: (visible: boolean) => void;
   onToggleClientDealershipLayer: (visible: boolean) => void;
   onToggleCompetitorLayer: (visible: boolean) => void;
@@ -137,6 +141,10 @@ export function MapView(props: Props) {
         radiusMiles={props.radiusMiles}
         radiusOptions={props.radiusOptions}
         onRadiusChange={props.onRadiusChange}
+        accentSource={props.accentSource}
+        onAccentSourceChange={props.onAccentSourceChange}
+        vehicleBrandName={props.vehicleBrandName}
+        agencyBrandName={props.agencyBrandName}
         showZipLayer={props.showZipLayer}
         showClientDealershipLayer={props.showClientDealershipLayer}
         showCompetitorLayer={props.showCompetitorLayer}

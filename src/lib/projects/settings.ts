@@ -1,9 +1,14 @@
 export const RADIUS_MILES_OPTIONS = [10, 25, 50] as const;
 export type RadiusMiles = (typeof RADIUS_MILES_OPTIONS)[number];
 
+/** Which palette drives the map, dashboard, and exported report. */
+export type AccentSource = 'vehicle' | 'agency';
+
 export interface ProjectMapSettings {
   focusDealershipId?: string | null;
   radiusMiles?: RadiusMiles;
+  /** `vehicle` = OEM brand accent; `agency` = agency brand colors. */
+  accentSource?: AccentSource;
   showZipLayer?: boolean;
   showClientDealershipLayer?: boolean;
   showCompetitorLayer?: boolean;
@@ -34,6 +39,7 @@ export function parseProjectMapSettings(raw: unknown): ProjectMapSettings {
     focusDealershipId:
       typeof s.focusDealershipId === 'string' ? s.focusDealershipId : undefined,
     radiusMiles: radiusMiles ?? 25,
+    accentSource: s.accentSource === 'agency' ? 'agency' : 'vehicle',
     showZipLayer: s.showZipLayer !== false,
     showClientDealershipLayer:
       s.showClientDealershipLayer !== undefined

@@ -41,7 +41,7 @@ const PAGE_W = 210;
 const PAGE_H = 297;
 const MARGIN = 16;
 const CONTENT_W = PAGE_W - MARGIN * 2;
-const HEADER_H = 42;
+const HEADER_H = 48;
 
 function hexToRgb(hex: string): Rgb {
   const m = hex.replace('#', '');
@@ -81,6 +81,9 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     mapImage,
   } = input;
   const generatedAt = input.generatedAt ?? new Date();
+  // The body accent follows the active palette chosen in the presentation (the
+  // caller passes either the vehicle/OEM brand or the agency brand here), while
+  // the agency stripe/letterhead always uses the agency primary.
   const accent = hexToRgb(brand.primaryColor);
   const agencyAccent = hexToRgb(agencyBrand.primaryColor);
   const accentSoft = tint(accent, 0.86);
@@ -117,7 +120,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     doc.text(text.toUpperCase(), x, y, { charSpace: 0.6 });
   }
 
-  function drawHeaderBand(contextLine: string) {
+  function drawHeaderBand() {
     // Enterprise letterhead band: full-bleed accent rule, neutral surface, and a
     // structured lockup — agency logo (left) · report identity (center) · client
     // meta panel (right). The OEM accent ties the header to the report body.
@@ -138,7 +141,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     doc.line(0, HEADER_H, PAGE_W, HEADER_H);
 
     // ── Left: agency logo, vertically centered ──
-    const logoH = 12.5;
+    const logoH = 17;
     const logoY = bandMid - logoH / 2;
     let lockX = MARGIN;
     let logoPlaced = false;
@@ -159,69 +162,64 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     }
     if (!logoPlaced) {
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(13);
+      doc.setFontSize(16);
       setText(hexToRgb(agencyBrand.textColor));
-      doc.text(agencyBrand.name, MARGIN, bandMid + 1.5);
-      lockX = MARGIN + doc.getTextWidth(agencyBrand.name) + 8;
+      doc.text(agencyBrand.name, MARGIN, bandMid + 2);
+      lockX = MARGIN + doc.getTextWidth(agencyBrand.name) + 9;
     }
 
     // ── Vertical divider between letterhead and report identity ──
     setStroke(LINE);
     doc.setLineWidth(0.3);
-    doc.line(lockX, logoY + 0.5, lockX, logoY + logoH - 0.5);
-    const idX = lockX + 7;
+    doc.line(lockX, logoY + 1, lockX, logoY + logoH - 1);
+    const idX = lockX + 8;
 
-    // ── Right: client/report meta panel — reserve its width first ──
-    const panelW = 52;
-    const panelX = PAGE_W - MARGIN - panelW;
+    // Cap the brand pill so it can never crowd out the title.
+    const panelW = 58;
 
     // Brand pill (OEM accent) — anchors the header to the accent-driven body.
+    // Sits on the "test13" title row so it reads as a chip beside the title.
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(9.5);
     const pillLabel = brand.name;
-    const pillW = Math.min(panelW, doc.getTextWidth(pillLabel) + 11);
-    const pillH = 7;
+    const dotR = 1.15;
+    const padX = 4.4;
+    const dotGap = 2.4;
+    const textW = doc.getTextWidth(pillLabel);
+    const pillW = Math.min(panelW, padX + dotR * 2 + dotGap + textW + padX);
+    const pillH = 8.5;
     const pillX = PAGE_W - MARGIN - pillW;
-    const pillY = bandMid - pillH - 1.2;
+    const pillY = bandMid + 4 - pillH / 2;
     setFill(accentSoft);
     setStroke(accentLine);
     doc.setLineWidth(0.25);
     doc.roundedRect(pillX, pillY, pillW, pillH, pillH / 2, pillH / 2, 'FD');
     setFill(accent);
-    doc.circle(pillX + 3.6, pillY + pillH / 2, 1.05, 'F');
+    doc.circle(pillX + padX + dotR, pillY + pillH / 2, dotR, 'F');
     setText(accent);
-    doc.text(pillLabel, pillX + 6.4, pillY + pillH / 2 + 1, { maxWidth: pillW - 8 });
+    doc.text(pillLabel, pillX + padX + dotR * 2 + dotGap, pillY + pillH / 2 + 1.2, { maxWidth: textW + 1 });
 
-    // Meta key/value rows under the pill, right-aligned and consistent.
-    const metaY = bandMid + 3.2;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6);
-    setText(FAINT);
-    doc.text('GENERATED', PAGE_W - MARGIN, metaY, { align: 'right', charSpace: 0.5 });
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    setText(INK2);
-    doc.text(formatDate(generatedAt), PAGE_W - MARGIN, metaY + 4.6, { align: 'right' });
-
-    // ── Center: report identity lockup, filling the band ──
-    const idMaxW = panelX - 6 - idX;
+    // ── Center: report identity lockup (kicker + project), filling the band ──
+    // Title room runs up to the brand pill's left edge, not the full panel.
+    const idMaxW = pillX - 6 - idX;
     setFill(accent);
-    doc.circle(idX + 0.9, bandMid - 6.4, 0.85, 'F');
+    doc.circle(idX + 1.1, bandMid - 6.6, 1.15, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6.5);
+    doc.setFontSize(11);
     setText(FAINT);
-    doc.text('MARKET OPPORTUNITY REPORT', idX + 3.4, bandMid - 5.6, { charSpace: 0.6 });
+    doc.text('MARKET OPPORTUNITY REPORT', idX + 4.4, bandMid - 5.5, { charSpace: 0.7 });
+
+    // Auto-fit the project name to one line: shrink before truncating.
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    setText(INK);
+    let titleSize = 19;
+    doc.setFontSize(titleSize);
+    while (titleSize > 11 && doc.getTextWidth(projectName) > idMaxW) {
+      titleSize -= 0.5;
+      doc.setFontSize(titleSize);
+    }
     const titleLine = doc.splitTextToSize(projectName, idMaxW)[0] ?? projectName;
-    doc.text(titleLine, idX, bandMid + 1.6);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    setText(MUTED);
-    const ctx = datasetLabel ? `${contextLine}   ·   ${datasetLabel}` : contextLine;
-    const ctxLine = doc.splitTextToSize(ctx, idMaxW)[0] ?? ctx;
-    doc.text(ctxLine, idX, bandMid + 7.2);
+    setText(INK);
+    doc.text(titleLine, idX, bandMid + 6.5);
   }
 
   function footer(pageLabel: string) {
@@ -325,9 +323,9 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   }
 
   // ═══════════════════════ PAGE 1 — Story & metrics ═══════════════════════
-  drawHeaderBand(useTradeArea ? `${subjectName} · ${radiusMiles}-mi trade area` : 'Full-market view');
+  drawHeaderBand();
 
-  let y = 52;
+  let y = 58;
 
   // Hero — eyebrow, then the lead-segment headcount well below it.
   eyebrow(`Market opportunity · ${subjectName}`, MARGIN, y);
@@ -456,8 +454,8 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   // ═══════════════════════ PAGE 2 — Map & breakdown ══════════════════════
   if (mapImage) {
     doc.addPage();
-    drawHeaderBand('Market map & segment detail');
-    y = 50;
+    drawHeaderBand();
+    y = 56;
 
     // Map snapshot, aspect-fit within content width, capped height.
     eyebrow('Market map', MARGIN, y);
