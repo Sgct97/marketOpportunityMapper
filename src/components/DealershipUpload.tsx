@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { uploadDealershipFile } from '@/app/actions/dealership';
 import type { DealershipImportSummary } from '@/lib/dealership/types';
+import { EMPTY_VALUE } from '@/lib/format';
 
 interface Props {
   projectId: string;
@@ -87,10 +88,10 @@ export function DealershipUpload({ projectId }: Props) {
           <p>On map: {summary.mappableCount.toLocaleString('en-US')}</p>
           {summary.pendingGeocodeCount > 0 && (
             <p className="opacity-80">
-              Pending geocode: {summary.pendingGeocodeCount} (address only — not shown on map yet)
+              Pending geocode: {summary.pendingGeocodeCount} (address only, not shown on map yet)
             </p>
           )}
-          <p>Brands: {summary.brands.join(', ') || '—'}</p>
+          <p>Brands: {summary.brands.join(', ') || EMPTY_VALUE}</p>
           {summary.invalid.length > 0 && (
             <details className="mt-2 text-xs">
               <summary className="cursor-pointer">Invalid rows (first {summary.invalid.length})</summary>

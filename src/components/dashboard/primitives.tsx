@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { hexToRgb } from '@/lib/map/colors';
-import { formatPercent } from '@/lib/format';
+import { formatPercent, EMPTY_VALUE } from '@/lib/format';
 
 export function tint(hex: string, alpha: number): string {
   const [r, g, b] = hexToRgb(hex);
@@ -211,7 +211,7 @@ export function Donut({
         <div className="absolute inset-0 grid place-items-center text-center">
           <div>
             <p className="mom-stat text-[24px] font-semibold leading-none">
-              {top ? formatPercent(top.share) : '—'}
+              {top ? formatPercent(top.share) : EMPTY_VALUE}
             </p>
             <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-[var(--faint)]">
               {title}

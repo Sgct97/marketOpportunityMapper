@@ -5,7 +5,7 @@ import type { MarketAnalysis } from '@/lib/audience/market-analysis';
 import type { DealershipRow } from '@/lib/dealership/types';
 import type { AccentSource, RadiusMiles } from '@/lib/projects/settings';
 import { fillColor, hexToRgb } from '@/lib/map/colors';
-import { formatNumber, formatPercent } from '@/lib/format';
+import { formatNumber, formatPercent, EMPTY_VALUE } from '@/lib/format';
 
 interface Props {
   audienceTypes: string[];
@@ -388,7 +388,7 @@ export function MapSidebar({
         />
         <div className="mt-1.5 flex justify-between text-[11px] text-[var(--faint)] tnum">
           <span>{stops[0]?.label ?? '0'}</span>
-          <span>{stops[stops.length - 1]?.label ?? '—'}</span>
+          <span>{stops[stops.length - 1]?.label ?? EMPTY_VALUE}</span>
         </div>
         <div className="mt-4 flex gap-4 text-[11px] text-[var(--muted)]">
           <span className="flex items-center gap-1.5">

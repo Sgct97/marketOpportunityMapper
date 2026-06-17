@@ -258,7 +258,7 @@ export function PresentationWorkspace({
   const handleExportPng = useCallback(async () => {
     const image = await captureExportImage();
     if (!image) {
-      window.alert('The map is still loading — open the Map view, then try exporting again.');
+      window.alert('The map is still loading. Open the Map view, then try exporting again.');
       return;
     }
     const link = document.createElement('a');

@@ -36,7 +36,7 @@ export default async function HomePage() {
         {!error && (!projects || projects.length === 0) && (
           <div className="mom-card mt-8 p-10 text-center">
             <p className="text-sm text-[var(--muted)]">
-              No projects yet — create one above.
+              No projects yet. Create one above.
             </p>
           </div>
         )}

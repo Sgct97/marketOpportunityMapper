@@ -1,5 +1,5 @@
 import type { DashboardModel } from '@/lib/audience/dashboard';
-import { formatCompact, formatNumber, formatPercent } from '@/lib/format';
+import { formatCompact, formatNumber, formatPercent, EMPTY_VALUE } from '@/lib/format';
 import {
   BarRow,
   Chip,
@@ -83,7 +83,7 @@ export function DashboardView({
               </div>
               <div className="mt-4 flex items-end gap-3">
                 <span className="mom-display-accent text-[56px] sm:text-[68px] font-semibold leading-[0.9] tnum">
-                  {leadSegment ? formatCompact(leadSegment.total) : '—'}
+                  {leadSegment ? formatCompact(leadSegment.total) : EMPTY_VALUE}
                 </span>
                 {leadSegment && (
                   <span className="mb-2 text-[15px] font-bold tnum" style={{ color: 'var(--accent)' }}>
@@ -95,7 +95,7 @@ export function DashboardView({
                 {leadSegment ? leadSegment.name : 'No segments in file'}
               </p>
               <p className="mt-1 text-[13px] text-[var(--faint)]">
-                Largest single audience{useTradeArea ? ' in the trade area' : ''} — a true headcount, not a sum.
+                Largest single audience{useTradeArea ? ' in the trade area' : ''}. A true headcount, not a sum.
               </p>
               <p className="mt-3 text-[14px] sm:text-[15px] leading-relaxed text-[var(--ink-2)]">
                 Part of <span className="tnum font-semibold text-[var(--ink)]">{formatNumber(heroReach)}</span> in
@@ -147,7 +147,7 @@ export function DashboardView({
           ) : (
             <KpiCard
               label="Lead segment share"
-              value={topSegment ? formatPercent(topSegment.share) : '—'}
+              value={topSegment ? formatPercent(topSegment.share) : EMPTY_VALUE}
               icon={<IconTarget />}
               sub={topSegment?.name ?? 'No segments'}
               delay={100}

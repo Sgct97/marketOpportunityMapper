@@ -1,5 +1,7 @@
 /** Presentation-friendly number formatting helpers. */
 
+export const EMPTY_VALUE = 'n/a';
+
 const FULL = new Intl.NumberFormat('en-US');
 
 /** Full grouped integer, e.g. 1,234,567. */
@@ -21,7 +23,7 @@ export function formatCompact(value: number): string {
 
 /** Percentage from a 0–1 ratio, e.g. 0.732 → "73%". */
 export function formatPercent(ratio: number, digits = 0): string {
-  if (!Number.isFinite(ratio)) return '—';
+  if (!Number.isFinite(ratio)) return EMPTY_VALUE;
   return `${(ratio * 100).toFixed(digits)}%`;
 }
 

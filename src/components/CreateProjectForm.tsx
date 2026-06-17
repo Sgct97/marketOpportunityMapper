@@ -23,7 +23,7 @@ export function CreateProjectForm() {
         name="name"
         type="text"
         required
-        placeholder="e.g. DFW Hyundai — Q2 pitch"
+        placeholder="e.g. DFW Hyundai, Q2 pitch"
         className="mom-field flex-1"
         disabled={pending}
       />

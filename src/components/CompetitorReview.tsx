@@ -108,7 +108,7 @@ export function CompetitorReview({
         <h3 className="text-sm font-semibold text-[var(--ink)]">Competitors</h3>
         <p className="text-xs text-[var(--muted)] mt-1.5">
           Search nearby dealers by brand, review results, and save to the map. Saving updates
-          competitors for that brand only — other brands already on the map are kept.
+          competitors for that brand only. Other brands already on the map are kept.
         </p>
       </div>
 

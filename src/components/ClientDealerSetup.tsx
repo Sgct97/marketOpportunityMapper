@@ -167,7 +167,7 @@ export function ClientDealerSetup({
             <div className="space-y-3 pt-2 border-t border-[var(--line)]">
               <div className="mom-warn px-3 py-2 text-xs">
                 Lookup found {matches.length} location{matches.length === 1 ? '' : 's'}. Click{' '}
-                <span className="font-semibold">Confirm and save to map</span> below — the map only
+                <span className="font-semibold">Confirm and save to map</span> below. The map only
                 shows dealerships after you confirm.
               </div>
               <p className="mom-eyebrow">Confirm location</p>

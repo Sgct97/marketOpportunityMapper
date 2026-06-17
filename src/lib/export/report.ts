@@ -3,7 +3,7 @@ import type { AgencyBrandConfig } from '@/lib/agency-brand';
 import type { BrandConfig } from '@/lib/brands';
 import type { DashboardModel, SegmentTotal, TopZip } from '@/lib/audience/dashboard';
 import type { MapImage } from '@/lib/map/export-capture';
-import { formatCompact, formatNumber, formatPercent } from '@/lib/format';
+import { formatCompact, formatNumber, formatPercent, EMPTY_VALUE } from '@/lib/format';
 
 export type { MapImage };
 
@@ -315,7 +315,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(15);
     setText(INK);
-    doc.text(buckets[0] ? formatPercent(buckets[0].share) : '—', cx, cy + 0.5, { align: 'center' });
+    doc.text(buckets[0] ? formatPercent(buckets[0].share) : EMPTY_VALUE, cx, cy + 0.5, { align: 'center' });
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(6);
     setText(FAINT);
@@ -333,7 +333,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(42);
   setText(accent);
-  const leadValue = leadSegment ? formatCompact(leadSegment.total) : '—';
+  const leadValue = leadSegment ? formatCompact(leadSegment.total) : EMPTY_VALUE;
   doc.text(leadValue, MARGIN, y);
   const leadW = doc.getTextWidth(leadValue);
   if (leadSegment) {
@@ -354,7 +354,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   doc.setFontSize(8.5);
   setText(FAINT);
   doc.text(
-    `Largest single audience${useTradeArea ? ' in the trade area' : ''} — a true headcount, not a sum.`,
+    `Largest single audience${useTradeArea ? ' in the trade area' : ''}. A true headcount, not a sum.`,
     MARGIN,
     y
   );
@@ -396,7 +396,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   if (useTradeArea) {
     kpiCard(MARGIN + kw + gap, y, kw, kh, 'Full-market reach', formatCompact(model.totalAudience), `${formatNumber(model.totalZips)} ZIPs across the market`);
   } else {
-    kpiCard(MARGIN + kw + gap, y, kw, kh, 'Lead segment share', model.topSegment ? formatPercent(model.topSegment.share) : '—', model.topSegment?.name ?? 'No segments');
+    kpiCard(MARGIN + kw + gap, y, kw, kh, 'Lead segment share', model.topSegment ? formatPercent(model.topSegment.share) : EMPTY_VALUE, model.topSegment?.name ?? 'No segments');
   }
   y += kh + gap;
   kpiCard(MARGIN, y, kw, kh, 'Market concentration', formatPercent(conc.top5Share), `from the top 5 ZIPs · ${formatNumber(conc.zipsForHalf)} ZIPs make up half`);
