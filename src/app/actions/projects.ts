@@ -54,33 +54,44 @@ export async function renameProject(projectId: string, formData: FormData): Prom
 }
 
 export async function deleteProject(projectId: string): Promise<{ error?: string }> {
+  const id = projectId.trim();
+  if (!id) return { error: 'Invalid project.' };
+
   const supabase = await createDataClient();
   const authOff = isAuthDisabled();
-  const userId = authOff ? null : await getActingUserId(supabase);
-
-  if (!authOff && !userId) {
-    return { error: 'Could not verify your account.' };
-  }
-
-  let existsQuery = supabase.from('projects').select('id').eq('id', projectId);
-  if (userId) existsQuery = existsQuery.eq('user_id', userId);
-
-  const { data: project } = await existsQuery.maybeSingle();
-  if (!project) {
-    return { error: 'Project not found.' };
-  }
 
   const { data: uploads } = await supabase
     .from('uploads')
     .select('storage_path')
-    .eq('project_id', projectId);
+    .eq('project_id', id);
 
-  let deleteQuery = supabase.from('projects').delete().eq('id', projectId);
-  if (userId) deleteQuery = deleteQuery.eq('user_id', userId);
+  let deleted: { id: string }[] | null = null;
+  let deleteError: { message: string } | null = null;
 
-  const { error } = await deleteQuery;
-  if (error) {
-    return { error: error.message };
+  if (authOff) {
+    const result = await supabase.from('projects').delete().eq('id', id).select('id');
+    deleted = result.data;
+    deleteError = result.error;
+  } else {
+    const userId = await getActingUserId(supabase);
+    if (!userId) {
+      return { error: 'Could not verify your account.' };
+    }
+    const result = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select('id');
+    deleted = result.data;
+    deleteError = result.error;
+  }
+
+  if (deleteError) {
+    return { error: deleteError.message };
+  }
+  if (!deleted?.length) {
+    return { error: 'Project not found. Refresh the page and try again.' };
   }
 
   const paths = uploads?.map(row => row.storage_path).filter(Boolean) ?? [];
@@ -91,6 +102,6 @@ export async function deleteProject(projectId: string): Promise<{ error?: string
     }
   }
 
-  revalidatePath('/');
+  revalidatePath('/', 'page');
   return {};
 }

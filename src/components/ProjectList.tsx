@@ -44,12 +44,19 @@ export function ProjectList({ projects }: { projects: ProjectListItem[] }) {
     if (result.error) {
       setError(result.error);
       setDeletingId(null);
+      if (result.error.includes('not found')) {
+        router.refresh();
+      }
       return;
     }
 
     setItems(prev => prev.filter(p => p.id !== id));
     router.refresh();
     setDeletingId(null);
+  }
+
+  if (items.length === 0) {
+    return null;
   }
 
   return (

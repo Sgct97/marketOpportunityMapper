@@ -4,6 +4,9 @@ import { CreateProjectForm } from '@/components/CreateProjectForm';
 import { ProjectList } from '@/components/ProjectList';
 import { PageChrome } from '@/components/PageChrome';
 
+/** Always load projects from Supabase — never serve a cached project list. */
+export const dynamic = 'force-dynamic';
+
 export default async function HomePage() {
   const supabase = await createDataClient();
   const { data: projects, error } = await supabase

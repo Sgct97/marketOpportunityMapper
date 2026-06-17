@@ -4,5 +4,5 @@
  * Leave unset on any public-facing production URL.
  */
 export function isAuthDisabled(): boolean {
-  return process.env.DISABLE_AUTH === 'true';
+  return process.env.DISABLE_AUTH?.trim().toLowerCase() === 'true';
 }
