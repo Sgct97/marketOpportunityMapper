@@ -51,3 +51,48 @@ export async function renameProject(projectId: string, formData: FormData): Prom
   revalidatePath('/');
   revalidatePath(`/projects/${projectId}`);
 }
+
+export async function deleteProject(projectId: string): Promise<{ error?: string }> {
+  const supabase = await createDataClient();
+  const userId = await getActingUserId(supabase);
+  if (!userId) {
+    return { error: 'Could not verify your account.' };
+  }
+
+  const { data: project } = await supabase
+    .from('projects')
+    .select('id')
+    .eq('id', projectId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (!project) {
+    return { error: 'Project not found.' };
+  }
+
+  const { data: uploads } = await supabase
+    .from('uploads')
+    .select('storage_path')
+    .eq('project_id', projectId);
+
+  const { error } = await supabase
+    .from('projects')
+    .delete()
+    .eq('id', projectId)
+    .eq('user_id', userId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  const paths = uploads?.map(row => row.storage_path).filter(Boolean) ?? [];
+  if (paths.length > 0) {
+    const { error: storageError } = await supabase.storage.from('uploads').remove(paths);
+    if (storageError) {
+      console.error('[deleteProject] storage cleanup:', storageError.message);
+    }
+  }
+
+  revalidatePath('/');
+  return {};
+}

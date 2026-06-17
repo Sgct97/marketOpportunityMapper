@@ -1,16 +1,8 @@
-import Link from 'next/link';
 import { createDataClient } from '@/lib/supabase/data';
 import { isAuthDisabled } from '@/lib/auth-config';
 import { CreateProjectForm } from '@/components/CreateProjectForm';
+import { ProjectList } from '@/components/ProjectList';
 import { PageChrome } from '@/components/PageChrome';
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
 
 export default async function HomePage() {
   const supabase = await createDataClient();
@@ -49,31 +41,7 @@ export default async function HomePage() {
           </div>
         )}
 
-        {!error && projects && projects.length > 0 && (
-          <ul className="mt-8 mom-card overflow-hidden divide-y divide-[var(--line)]">
-            {projects.map(p => (
-              <li key={p.id}>
-                <Link
-                  href={`/projects/${p.id}`}
-                  className="group flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-[var(--surface-2)]"
-                >
-                  <span className="text-sm font-medium text-[var(--ink)] truncate">
-                    {p.name}
-                  </span>
-                  <span className="flex items-center gap-2 shrink-0 text-xs text-[var(--faint)]">
-                    Updated {formatDate(p.updated_at)}
-                    <span
-                      aria-hidden
-                      className="text-[var(--accent)] opacity-0 -translate-x-1 transition group-hover:opacity-100 group-hover:translate-x-0"
-                    >
-                      →
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+        {!error && projects && projects.length > 0 && <ProjectList projects={projects} />}
       </main>
     </PageChrome>
   );
