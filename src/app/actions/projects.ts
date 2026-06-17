@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { isAuthDisabled } from '@/lib/auth-config';
 import { createDataClient, getActingUserId } from '@/lib/supabase/data';
 
 export async function createProject(formData: FormData) {
@@ -54,18 +55,17 @@ export async function renameProject(projectId: string, formData: FormData): Prom
 
 export async function deleteProject(projectId: string): Promise<{ error?: string }> {
   const supabase = await createDataClient();
-  const userId = await getActingUserId(supabase);
-  if (!userId) {
+  const authOff = isAuthDisabled();
+  const userId = authOff ? null : await getActingUserId(supabase);
+
+  if (!authOff && !userId) {
     return { error: 'Could not verify your account.' };
   }
 
-  const { data: project } = await supabase
-    .from('projects')
-    .select('id')
-    .eq('id', projectId)
-    .eq('user_id', userId)
-    .maybeSingle();
+  let existsQuery = supabase.from('projects').select('id').eq('id', projectId);
+  if (userId) existsQuery = existsQuery.eq('user_id', userId);
 
+  const { data: project } = await existsQuery.maybeSingle();
   if (!project) {
     return { error: 'Project not found.' };
   }
@@ -75,12 +75,10 @@ export async function deleteProject(projectId: string): Promise<{ error?: string
     .select('storage_path')
     .eq('project_id', projectId);
 
-  const { error } = await supabase
-    .from('projects')
-    .delete()
-    .eq('id', projectId)
-    .eq('user_id', userId);
+  let deleteQuery = supabase.from('projects').delete().eq('id', projectId);
+  if (userId) deleteQuery = deleteQuery.eq('user_id', userId);
 
+  const { error } = await deleteQuery;
   if (error) {
     return { error: error.message };
   }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { deleteProject } from '@/app/actions/projects';
 
 export interface ProjectListItem {
@@ -21,8 +21,13 @@ function formatDate(iso: string) {
 
 export function ProjectList({ projects }: { projects: ProjectListItem[] }) {
   const router = useRouter();
+  const [items, setItems] = useState(projects);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setItems(projects);
+  }, [projects]);
 
   async function handleDelete(id: string, name: string) {
     if (
@@ -42,6 +47,7 @@ export function ProjectList({ projects }: { projects: ProjectListItem[] }) {
       return;
     }
 
+    setItems(prev => prev.filter(p => p.id !== id));
     router.refresh();
     setDeletingId(null);
   }
@@ -50,7 +56,7 @@ export function ProjectList({ projects }: { projects: ProjectListItem[] }) {
     <>
       {error && <div className="mom-alert mt-4 p-3 text-sm">{error}</div>}
       <ul className="mt-8 mom-card overflow-hidden divide-y divide-[var(--line)]">
-        {projects.map(p => (
+        {items.map(p => (
           <li key={p.id} className="flex items-stretch">
             <Link
               href={`/projects/${p.id}`}
