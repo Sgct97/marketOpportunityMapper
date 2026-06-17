@@ -40,6 +40,8 @@ interface Props {
   active?: boolean;
   /** Presentation theme — drives basemap + outline contrast. */
   theme?: MapTheme;
+  /** Receives the map instance once layers are ready (null on unmount). Used for export capture. */
+  onMapReady?: (map: maplibregl.Map | null) => void;
 }
 
 /**
@@ -194,6 +196,7 @@ export function OpportunityMap({
   onFocusDealership,
   active = true,
   theme = 'dark',
+  onMapReady,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -203,11 +206,13 @@ export function OpportunityMap({
   const hoveredFeatureIdRef = useRef<string | number | null>(null);
   const onFocusRef = useRef(onFocusDealership);
   const focusIdRef = useRef(focusDealershipId);
+  const onMapReadyRef = useRef(onMapReady);
 
   useEffect(() => {
     onFocusRef.current = onFocusDealership;
     focusIdRef.current = focusDealershipId;
-  }, [onFocusDealership, focusDealershipId]);
+    onMapReadyRef.current = onMapReady;
+  }, [onFocusDealership, focusDealershipId, onMapReady]);
 
   const [layersReady, setLayersReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -341,6 +346,7 @@ export function OpportunityMap({
       bindDealershipHandlers(map);
       setLayersReady(true);
       setMapError(null);
+      onMapReadyRef.current?.(map);
       requestAnimationFrame(() => map.resize());
     };
 
@@ -352,6 +358,8 @@ export function OpportunityMap({
         zoom: 4,
         attributionControl: { compact: true },
         fadeDuration: 0,
+        // Required so the WebGL canvas can be read back for screenshot / PDF export.
+        canvasContextAttributes: { preserveDrawingBuffer: true },
       });
 
       map.addControl(
@@ -397,6 +405,7 @@ export function OpportunityMap({
       hoverBoundRef.current = false;
       dealerBoundRef.current = false;
       hoveredFeatureIdRef.current = null;
+      onMapReadyRef.current?.(null);
       popupRef.current?.remove();
       popupRef.current = null;
       mapRef.current?.remove();

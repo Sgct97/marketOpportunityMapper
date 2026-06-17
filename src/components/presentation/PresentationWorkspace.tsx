@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Map as MapLibreMap } from 'maplibre-gl';
 import {
   aggregateAudienceByZip,
   listAudienceTypes,
@@ -24,6 +25,7 @@ import {
   type RadiusMiles,
 } from '@/lib/projects/settings';
 import { saveProjectMapSettings } from '@/app/actions/project-settings';
+import { captureMapForExport } from '@/lib/map/export-capture';
 import { MapView } from '@/components/map/MapView';
 import { DashboardView } from '@/components/dashboard/DashboardView';
 import {
@@ -42,6 +44,15 @@ interface Props {
   rows: AudienceZipRow[];
   dealerships: DealershipRow[];
   initialSettings: ProjectMapSettings;
+}
+
+function slugify(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '') || 'market-opportunity'
+  );
 }
 
 function resolveInitialFocus(
@@ -205,6 +216,72 @@ export function PresentationWorkspace({
     [projectId]
   );
 
+  // Live MapLibre instance, captured for screenshot / PDF export.
+  const mapInstanceRef = useRef<MapLibreMap | null>(null);
+
+  const exportFocus = useMemo(() => {
+    if (focusDealership?.latitude == null || focusDealership?.longitude == null) return null;
+    return { longitude: focusDealership.longitude, latitude: focusDealership.latitude };
+  }, [focusDealership]);
+
+  const prepareMapForCapture = useCallback(async () => {
+    if (view !== 'map') {
+      setView('map');
+      // Give React + MapLibre time to show the pane and attach a real canvas size.
+      await new Promise<void>(resolve => setTimeout(resolve, 120));
+    }
+    mapInstanceRef.current?.resize();
+    await new Promise<void>(resolve =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    );
+  }, [view]);
+
+  const captureExportImage = useCallback(async () => {
+    await prepareMapForCapture();
+    const capture = captureMapForExport(mapInstanceRef.current, exportFocus, radiusMiles);
+    // Hard ceiling so Export never hangs indefinitely if the map misbehaves.
+    const timeout = new Promise<null>(resolve => setTimeout(() => resolve(null), 10_000));
+    return Promise.race([capture, timeout]);
+  }, [prepareMapForCapture, exportFocus, radiusMiles]);
+
+  const handleExportPng = useCallback(async () => {
+    const image = await captureExportImage();
+    if (!image) {
+      window.alert('The map is still loading — open the Map view, then try exporting again.');
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = image.dataUrl;
+    link.download = `${slugify(projectName)}-map.png`;
+    link.click();
+  }, [captureExportImage, projectName]);
+
+  const handleExportPdf = useCallback(async () => {
+    const image = await captureExportImage();
+    if (!image) {
+      window.alert(
+        'Could not capture the map in time. Stay on the Map view, wait for tiles to load, then try again.'
+      );
+      return;
+    }
+    const { buildMarketReport } = await import('@/lib/export/report');
+    const { getAgencyBrand, loadLogoDataUrl } = await import('@/lib/agency-brand');
+    const agencyBrand = getAgencyBrand(brandId);
+    const logoDataUrl = await loadLogoDataUrl(agencyBrand.logo);
+    const doc = buildMarketReport({
+      brand,
+      agencyBrand,
+      logoDataUrl,
+      projectName,
+      datasetLabel,
+      focusName: focusDealership?.name ?? null,
+      radiusMiles,
+      model: dashboardModel,
+      mapImage: image,
+    });
+    doc.save(`${slugify(projectName)}-market-report.pdf`);
+  }, [captureExportImage, brand, brandId, projectName, datasetLabel, focusDealership, radiusMiles, dashboardModel]);
+
   function toggleType(type: string) {
     setSelectedTypes(prev =>
       prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
@@ -259,6 +336,8 @@ export function PresentationWorkspace({
         contextLabel={contextLabel}
         theme={theme}
         onToggleTheme={toggleTheme}
+        onExportPdf={handleExportPdf}
+        onExportPng={handleExportPng}
       />
 
       <div className="flex flex-1 min-h-0">
@@ -309,6 +388,9 @@ export function PresentationWorkspace({
             }}
             marketAnalysis={marketAnalysis}
             hasFocusDealership={hasFocus}
+            onMapReady={m => {
+              mapInstanceRef.current = m;
+            }}
           />
         </div>
 

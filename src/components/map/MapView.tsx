@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useCallback, useState } from 'react';
+import type { Map as MapLibreMap } from 'maplibre-gl';
 import type { AudienceZipRow } from '@/lib/audience/aggregate';
 import type { MarketAnalysis } from '@/lib/audience/market-analysis';
 import type { MapTheme } from '@/lib/map/basemap';
@@ -56,6 +57,7 @@ interface Props {
   onToggleRadiusLayer: (visible: boolean) => void;
   marketAnalysis: MarketAnalysis | null;
   hasFocusDealership: boolean;
+  onMapReady?: (map: MapLibreMap | null) => void;
 }
 
 function ControlsIcon() {
@@ -99,6 +101,7 @@ export function MapView(props: Props) {
         showCompetitorLayer={props.showCompetitorLayer}
         showRadiusLayer={props.showRadiusLayer}
         onFocusDealership={props.onFocusDealership}
+        onMapReady={props.onMapReady}
       />
 
       {!controlsOpen && (

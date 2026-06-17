@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ExportMenu } from './ExportMenu';
 
 export type PresentationView = 'map' | 'dashboard';
 export type PresentationTheme = 'dark' | 'light';
@@ -14,6 +15,8 @@ interface Props {
   contextLabel?: string | null;
   theme: PresentationTheme;
   onToggleTheme: () => void;
+  onExportPdf: () => void | Promise<void>;
+  onExportPng: () => void | Promise<void>;
 }
 
 function SunIcon() {
@@ -91,6 +94,8 @@ export function PresentationHeader({
   contextLabel,
   theme,
   onToggleTheme,
+  onExportPdf,
+  onExportPng,
 }: Props) {
   const monogram = (brandName?.trim()?.[0] ?? 'M').toUpperCase();
 
@@ -167,6 +172,7 @@ export function PresentationHeader({
             {contextLabel}
           </span>
         )}
+        <ExportMenu onExportPdf={onExportPdf} onExportPng={onExportPng} />
         <button
           type="button"
           onClick={onToggleTheme}
