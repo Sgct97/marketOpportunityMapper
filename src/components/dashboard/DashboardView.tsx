@@ -1,4 +1,6 @@
 import type { DashboardModel } from '@/lib/audience/dashboard';
+import { formatZipDisplay, formatZipDisplayTitle } from '@/lib/map/zip-labels';
+import type { ZipLabel } from '@/lib/map/zip-labels';
 import { formatCompact, formatNumber, formatPercent, EMPTY_VALUE } from '@/lib/format';
 import {
   BarRow,
@@ -14,6 +16,7 @@ import {
 
 interface Props {
   model: DashboardModel;
+  zipLabels: Record<string, ZipLabel>;
   /** Luminous on-dark brand accent (hex). */
   glow: string;
   brandName: string;
@@ -24,6 +27,7 @@ interface Props {
 
 export function DashboardView({
   model,
+  zipLabels,
   glow,
   brandName,
   datasetLabel,
@@ -47,20 +51,20 @@ export function DashboardView({
   );
   const topZips = useTradeArea ? tradeArea!.topZips : concentration.topZips;
   const topZipsScopeLabel = useTradeArea ? `Within ${radiusMiles} mi` : 'Across market';
-  const maxSegmentTotal = topSegment?.total ?? 1;
   const topZipMax = topZips[0]?.count ?? 1;
   const subjectName = focusName || brandName;
   const compositionFacets = composition.slice(0, 2);
   const hasComposition = compositionFacets.length > 0;
 
-  // Hero leads with the LARGEST SINGLE SEGMENT — a real, non-overlapping
-  // headcount we can defend to a client. The summed multi-segment "reach"
-  // (which double-counts people across segments) is demoted to a supporting
-  // line and a KPI, never the headline. Concentration tells the geographic story.
+  // Hero leads with TOTAL REACH (all segments, overlapping) so the headline
+  // matches the full market picture. The largest single segment — a defensible
+  // non-overlapping headcount — sits directly underneath as the supporting story.
   const heroReach = useTradeArea ? tradeArea!.audienceInRadius : totalAudience;
   const heroZips = useTradeArea ? tradeArea!.zipsInRadius : totalZips;
-  const heroScope = useTradeArea ? `within ${subjectName}'s ${radiusMiles}-mi trade area` : 'across the market';
   const leadSegment = (useTradeArea ? tradeArea!.leadSegment : null) ?? topSegment;
+  const activeSegments = useTradeArea ? tradeArea!.segments : segments;
+  const activeAudience = heroReach;
+  const maxSegmentTotal = activeSegments[0]?.total ?? 1;
   const conc = useTradeArea
     ? { top5Share: tradeArea!.top5Share, zipsForHalf: tradeArea!.zipsForHalf }
     : { top5Share: concentration.top5Share, zipsForHalf: concentration.zipsForHalf };
@@ -83,25 +87,36 @@ export function DashboardView({
               </div>
               <div className="mt-4 flex items-end gap-3">
                 <span className="mom-display-accent text-[56px] sm:text-[68px] font-semibold leading-[0.9] tnum">
-                  {leadSegment ? formatCompact(leadSegment.total) : EMPTY_VALUE}
+                  {formatCompact(heroReach)}
                 </span>
-                {leadSegment && (
-                  <span className="mb-2 text-[15px] font-bold tnum" style={{ color: 'var(--accent)' }}>
-                    {formatPercent(leadSegment.share)} of reach
-                  </span>
-                )}
               </div>
               <p className="mt-2 text-[15px] sm:text-[16px] font-semibold leading-snug text-[var(--ink)]">
-                {leadSegment ? leadSegment.name : 'No segments in file'}
+                Total reach (all segments)
               </p>
               <p className="mt-1 text-[13px] text-[var(--faint)]">
-                Largest single audience{useTradeArea ? ' in the trade area' : ''}. A true headcount, not a sum.
+                {(useTradeArea ? activeSegments.length : segmentCount)} segments · {formatNumber(heroZips)} ZIPs · overlapping
+                {useTradeArea ? ` · within ${radiusMiles} mi of ${subjectName}` : ' · across the market'}
               </p>
-              <p className="mt-3 text-[14px] sm:text-[15px] leading-relaxed text-[var(--ink-2)]">
-                Part of <span className="tnum font-semibold text-[var(--ink)]">{formatNumber(heroReach)}</span> in
-                total reach across {segmentCount} segments {heroScope}, spanning{' '}
-                <span className="tnum font-semibold text-[var(--ink)]">{formatNumber(heroZips)}</span> ZIP codes.
-              </p>
+
+              {leadSegment && (
+                <div className="mt-5 pt-5 border-t border-[var(--line-soft)]">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className="mom-display text-[38px] sm:text-[44px] font-semibold leading-none tnum text-[var(--ink)]">
+                      {formatCompact(leadSegment.total)}
+                    </span>
+                    <span className="text-[14px] sm:text-[15px] font-bold tnum" style={{ color: 'var(--accent)' }}>
+                      {formatPercent(leadSegment.share)} of reach
+                    </span>
+                  </div>
+                  <p className="mt-1.5 text-[14px] sm:text-[15px] font-semibold leading-snug text-[var(--ink)]">
+                    {leadSegment.name}
+                  </p>
+                  <p className="mt-1 text-[13px] text-[var(--faint)]">
+                    Largest single audience{useTradeArea ? ' in the trade area' : ''}. A true headcount, not a sum.
+                  </p>
+                </div>
+              )}
+
               <p className="mt-3 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] leading-snug"
                 style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent-line)', color: 'var(--ink-2)' }}>
                 <span className="font-semibold" style={{ color: 'var(--accent)' }}>
@@ -129,19 +144,19 @@ export function DashboardView({
         {/* KPI row */}
         <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
           <KpiCard
-            label="Total reach (all segments)"
-            value={formatCompact(heroReach)}
-            accent={useTradeArea ? formatPercent(tradeArea!.share) : null}
+            label="Largest single audience"
+            value={leadSegment ? formatCompact(leadSegment.total) : EMPTY_VALUE}
+            accent={leadSegment ? formatPercent(leadSegment.share) : null}
             icon={<IconUsers />}
-            sub={`${segmentCount} segments · ${formatNumber(heroZips)} ZIPs · overlapping`}
+            sub={leadSegment?.name ?? 'No segments in file'}
             delay={40}
           />
           {useTradeArea ? (
             <KpiCard
-              label="Full-market reach"
-              value={formatCompact(totalAudience)}
+              label="ZIPs in trade area"
+              value={formatNumber(heroZips)}
               icon={<IconTarget />}
-              sub={`${formatNumber(totalZips)} ZIPs across the market`}
+              sub={`within ${radiusMiles} mi of ${subjectName}`}
               delay={100}
             />
           ) : (
@@ -202,17 +217,23 @@ export function DashboardView({
           {/* Segment breakdown */}
           <div className="lg:col-span-7">
             <SectionCard
-              eyebrow={`Full dataset · ${segmentCount} segments`}
+              eyebrow={
+                useTradeArea
+                  ? `Trade area · ${activeSegments.length} segments`
+                  : `Full dataset · ${segmentCount} segments`
+              }
               title="Audience segment breakdown"
               right={
                 <div>
-                  <p className="mom-stat text-[20px] font-semibold">{formatNumber(totalAudience)}</p>
-                  <p className="text-[11px] text-[var(--faint)]">total audience</p>
+                  <p className="mom-stat text-[20px] font-semibold">{formatNumber(activeAudience)}</p>
+                  <p className="text-[11px] text-[var(--faint)]">
+                    {useTradeArea ? 'trade-area reach' : 'total audience'}
+                  </p>
                 </div>
               }
             >
               <div className="divide-y divide-[var(--line-soft)]">
-                {segments.map((seg, i) => (
+                {activeSegments.map((seg, i) => (
                   <BarRow
                     key={seg.name}
                     rank={i + 1}
@@ -246,8 +267,8 @@ export function DashboardView({
                     >
                       {i + 1}
                     </span>
-                    <span className="w-14 text-[13.5px] tnum font-medium text-[var(--ink-2)]">
-                      {z.zip}
+                    <span className="min-w-0 flex-1 text-[13.5px] font-medium text-[var(--ink-2)] truncate" title={formatZipDisplayTitle(z.zip, zipLabels)}>
+                      {formatZipDisplay(z.zip, zipLabels)}
                     </span>
                     <div className="mom-bar-track flex-1">
                       <div
@@ -298,8 +319,9 @@ export function DashboardView({
                               color: 'var(--accent)',
                               background: 'var(--accent-soft)',
                             }}
+                            title={formatZipDisplayTitle(z.zip, zipLabels)}
                           >
-                            {z.zip}
+                            {formatZipDisplay(z.zip, zipLabels)}
                             <span className="text-[var(--muted)]">{formatNumber(z.count)}</span>
                           </span>
                         ))}
@@ -324,10 +346,12 @@ export function DashboardView({
         {/* Methodology */}
         <p className="mt-7 text-[11px] leading-relaxed text-[var(--faint)] max-w-3xl">
           {datasetLabel ? `Source: ${datasetLabel}. ` : ''}
-          “Reach” is the sum of segment counts across the active file; the same person can belong to
-          more than one segment, so reach reflects total addressable touchpoints, not unique
-          individuals. Trade-area figures use straight-line distance from the client pin to ZIP
-          centroids (not drive-time).
+          {useTradeArea
+            ? `Trade-area figures include only ZIPs within ${radiusMiles} mi of ${subjectName}. `
+            : ''}
+          “Reach” is the sum of segment counts; the same person can belong to more than one
+          segment, so reach reflects total addressable touchpoints, not unique individuals.
+          Distance uses straight-line miles from the client pin to ZIP centroids (not drive-time).
         </p>
       </div>
     </div>

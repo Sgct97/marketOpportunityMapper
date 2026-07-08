@@ -20,6 +20,7 @@ import {
 import type { DealershipRow } from '@/lib/dealership/types';
 import { agencyAccent, resolveBrandAccent } from '@/lib/brands';
 import { getAgencyBrand } from '@/lib/agency-brand';
+import { buildZipLabelMap } from '@/lib/map/zip-labels';
 import { fetchZipBoundaries } from '@/lib/map/boundaries';
 import { centroidsFromBoundaries } from '@/lib/map/centroids';
 import type { LatLng } from '@/lib/map/centroids';
@@ -174,6 +175,8 @@ export function PresentationWorkspace({
     [rows]
   );
 
+  const zipLabels = useMemo(() => buildZipLabelMap(allDataZips), [allDataZips]);
+
   const [zipCentroids, setZipCentroids] = useState<Record<string, LatLng>>({});
 
   useEffect(() => {
@@ -299,9 +302,10 @@ export function PresentationWorkspace({
       radiusMiles,
       model: dashboardModel,
       mapImage: image,
+      zipLabels,
     });
     doc.save(`${slugify(projectName)}-market-report.pdf`);
-  }, [captureExportImage, brand, brandId, projectName, datasetLabel, focusDealership, radiusMiles, dashboardModel]);
+  }, [captureExportImage, brand, brandId, projectName, datasetLabel, focusDealership, radiusMiles, dashboardModel, zipLabels]);
 
   function toggleType(type: string) {
     setSelectedTypes(prev =>
@@ -388,6 +392,7 @@ export function PresentationWorkspace({
             active={view === 'map'}
             theme={theme}
             rows={rows}
+            zipLabels={zipLabels}
             excludedZips={excludedZips}
             onToggleZipExcluded={handleToggleZipExcluded}
             onRestoreAllZips={handleRestoreAllZips}
@@ -447,6 +452,7 @@ export function PresentationWorkspace({
           <div className="flex flex-1 min-h-0">
             <DashboardView
               model={dashboardModel}
+              zipLabels={zipLabels}
               glow={accentColor}
               brandName={brand.name}
               datasetLabel={datasetLabel}

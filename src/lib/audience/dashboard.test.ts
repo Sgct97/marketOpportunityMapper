@@ -167,6 +167,8 @@ describe('buildDashboardModel', () => {
     expect(model.tradeArea?.leadSegment?.name).toBe('Hispanic HYUNDAI/KIA Intenders');
     expect(model.tradeArea?.leadSegment?.total).toBe(800);
     expect(model.tradeArea?.leadSegment?.share).toBeCloseTo(800 / 1500, 5);
+    expect(model.tradeArea?.segments.reduce((s, seg) => s + seg.total, 0)).toBe(1500);
+    expect(model.tradeArea?.segments.every(seg => seg.zips <= 2)).toBe(true);
   });
 
   it('reports competitors and finds white space away from rivals', () => {

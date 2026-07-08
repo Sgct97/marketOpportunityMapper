@@ -8,6 +8,7 @@ import type { MarketAnalysis } from '@/lib/audience/market-analysis';
 import type { MapTheme } from '@/lib/map/basemap';
 import type { DealershipRow } from '@/lib/dealership/types';
 import type { AccentSource, RadiusMiles } from '@/lib/projects/settings';
+import type { ZipLabel } from '@/lib/map/zip-labels';
 import { MapSidebar } from './MapSidebar';
 
 const OpportunityMap = dynamic(
@@ -26,6 +27,7 @@ interface Props {
   active: boolean;
   theme: MapTheme;
   rows: AudienceZipRow[];
+  zipLabels: Record<string, ZipLabel>;
   excludedZips: string[];
   onToggleZipExcluded: (zip: string) => void;
   onRestoreAllZips: () => void;
@@ -97,6 +99,7 @@ export function MapView(props: Props) {
         theme={props.theme}
         active={props.active}
         rows={props.rows}
+        zipLabels={props.zipLabels}
         excludedZips={props.excludedZips}
         onToggleZipExcluded={props.onToggleZipExcluded}
         selectedTypes={props.selectedTypes}
@@ -161,6 +164,7 @@ export function MapView(props: Props) {
         onToggleCompetitorLayer={props.onToggleCompetitorLayer}
         onToggleRadiusLayer={props.onToggleRadiusLayer}
         marketAnalysis={props.marketAnalysis}
+        zipLabels={props.zipLabels}
         hasFocusDealership={props.hasFocusDealership}
       />
       )}

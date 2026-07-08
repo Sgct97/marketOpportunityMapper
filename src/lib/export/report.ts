@@ -3,6 +3,8 @@ import type { AgencyBrandConfig } from '@/lib/agency-brand';
 import type { BrandConfig } from '@/lib/brands';
 import type { DashboardModel, SegmentTotal, TopZip } from '@/lib/audience/dashboard';
 import type { MapImage } from '@/lib/map/export-capture';
+import { formatZipDisplay } from '@/lib/map/zip-labels';
+import type { ZipLabel } from '@/lib/map/zip-labels';
 import { formatCompact, formatNumber, formatPercent, EMPTY_VALUE } from '@/lib/format';
 
 export type { MapImage };
@@ -21,6 +23,7 @@ export interface ReportInput {
   model: DashboardModel;
   /** Captured map snapshot, or null if the map was unavailable. */
   mapImage: MapImage | null;
+  zipLabels?: Record<string, ZipLabel>;
   generatedAt?: Date;
 }
 
@@ -79,6 +82,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     radiusMiles,
     model,
     mapImage,
+    zipLabels = {},
   } = input;
   const generatedAt = input.generatedAt ?? new Date();
   // The body accent follows the active palette chosen in the presentation (the
@@ -99,6 +103,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   const heroReach = useTradeArea ? tradeArea!.audienceInRadius : model.totalAudience;
   const heroZips = useTradeArea ? tradeArea!.zipsInRadius : model.totalZips;
   const leadSegment = (useTradeArea ? tradeArea!.leadSegment : null) ?? model.topSegment;
+  const activeSegments = useTradeArea ? tradeArea!.segments : model.segments;
   const conc = useTradeArea
     ? { top5Share: tradeArea!.top5Share, zipsForHalf: tradeArea!.zipsForHalf }
     : { top5Share: model.concentration.top5Share, zipsForHalf: model.concentration.zipsForHalf };
@@ -327,46 +332,62 @@ export function buildMarketReport(input: ReportInput): jsPDF {
 
   let y = 58;
 
-  // Hero — eyebrow, then the lead-segment headcount well below it.
+  // Hero — total reach first, then the largest single segment underneath.
   eyebrow(`Market opportunity · ${subjectName}`, MARGIN, y);
   y += 16;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(42);
   setText(accent);
-  const leadValue = leadSegment ? formatCompact(leadSegment.total) : EMPTY_VALUE;
-  doc.text(leadValue, MARGIN, y);
-  const leadW = doc.getTextWidth(leadValue);
-  if (leadSegment) {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    setText(accent);
-    doc.text(`${formatPercent(leadSegment.share)} of reach`, MARGIN + leadW + 5, y - 2);
-  }
+  const reachValue = formatCompact(heroReach);
+  doc.text(reachValue, MARGIN, y);
   y += 9;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12.5);
   setText(INK);
-  const leadName = leadSegment ? leadSegment.name : 'No segments in file';
-  const nameLines: string[] = doc.splitTextToSize(leadName, CONTENT_W);
-  doc.text(nameLines, MARGIN, y);
-  y += nameLines.length * 5.6 + 1;
+  doc.text('Total reach (all segments)', MARGIN, y);
+  y += 6;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   setText(FAINT);
-  doc.text(
-    `Largest single audience${useTradeArea ? ' in the trade area' : ''}. A true headcount, not a sum.`,
-    MARGIN,
-    y
-  );
+  const reachMeta = `${activeSegments.length} segments · ${formatNumber(heroZips)} ZIPs · overlapping${
+    useTradeArea ? ` · within ${radiusMiles} mi of ${subjectName}` : ' · across the market'
+  }`;
+  doc.text(reachMeta, MARGIN, y);
   y += 8;
-  doc.setFontSize(10);
-  setText(INK2);
-  const story = `Part of ${formatNumber(heroReach)} in total reach across ${model.segmentCount} segments ${
-    useTradeArea ? `within ${subjectName}'s ${radiusMiles}-mi trade area` : 'across the market'
-  }, spanning ${formatNumber(heroZips)} ZIP codes.`;
-  const storyLines: string[] = doc.splitTextToSize(story, CONTENT_W);
-  doc.text(storyLines, MARGIN, y);
-  y += storyLines.length * 5 + 5;
+
+  if (leadSegment) {
+    setStroke(LINE);
+    doc.setLineWidth(0.2);
+    doc.line(MARGIN, y, MARGIN + CONTENT_W, y);
+    y += 7;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(30);
+    setText(INK);
+    const leadValue = formatCompact(leadSegment.total);
+    doc.text(leadValue, MARGIN, y);
+    const leadW = doc.getTextWidth(leadValue);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    setText(accent);
+    doc.text(`${formatPercent(leadSegment.share)} of reach`, MARGIN + leadW + 5, y - 1);
+    y += 8;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    setText(INK);
+    const leadName = leadSegment.name;
+    const nameLines: string[] = doc.splitTextToSize(leadName, CONTENT_W);
+    doc.text(nameLines, MARGIN, y);
+    y += nameLines.length * 5.2 + 1;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    setText(FAINT);
+    doc.text(
+      `Largest single audience${useTradeArea ? ' in the trade area' : ''}. A true headcount, not a sum.`,
+      MARGIN,
+      y
+    );
+    y += 8;
+  }
 
   // Concentration callout
   setFill(accentSoft);
@@ -388,13 +409,21 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   const kh = 28;
   kpiCard(
     MARGIN, y, kw, kh,
-    'Total reach (all segments)',
-    formatCompact(heroReach),
-    `${model.segmentCount} segments · ${formatNumber(heroZips)} ZIPs · overlapping`,
-    useTradeArea ? formatPercent(tradeArea!.share) : undefined
+    'Largest single audience',
+    leadSegment ? formatCompact(leadSegment.total) : EMPTY_VALUE,
+    leadSegment?.name ?? 'No segments in file',
+    leadSegment ? formatPercent(leadSegment.share) : undefined
   );
   if (useTradeArea) {
-    kpiCard(MARGIN + kw + gap, y, kw, kh, 'Full-market reach', formatCompact(model.totalAudience), `${formatNumber(model.totalZips)} ZIPs across the market`);
+    kpiCard(
+      MARGIN + kw + gap,
+      y,
+      kw,
+      kh,
+      'ZIPs in trade area',
+      formatNumber(heroZips),
+      `within ${radiusMiles} mi of ${subjectName}`
+    );
   } else {
     kpiCard(MARGIN + kw + gap, y, kw, kh, 'Lead segment share', model.topSegment ? formatPercent(model.topSegment.share) : EMPTY_VALUE, model.topSegment?.name ?? 'No segments');
   }
@@ -493,7 +522,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     const rightX = MARGIN + leftW + colGap;
     const tableTop = y;
 
-    drawSegmentTable(MARGIN, tableTop, leftW, model.segments, model.totalAudience);
+    drawSegmentTable(MARGIN, tableTop, leftW, activeSegments, heroReach);
     drawTopZips(rightX, tableTop, rightW, topZips, topZipsScope);
 
     footer(`Page 2 of 2  ·  Generated ${formatDate(generatedAt)}`);
@@ -552,7 +581,9 @@ export function buildMarketReport(input: ReportInput): jsPDF {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
       setText(INK2);
-      doc.text(z.zip, x + 5, ty);
+      const zipLabel = formatZipDisplay(z.zip, zipLabels);
+      const zipLines: string[] = doc.splitTextToSize(zipLabel, w - 34);
+      doc.text(zipLines[0] ?? zipLabel, x + 5, ty);
       doc.setFont('helvetica', 'bold');
       setText(INK);
       doc.text(formatNumber(z.count), x + w, ty, { align: 'right' });

@@ -2,6 +2,8 @@
 
 import { legendStops } from '@/lib/audience/aggregate';
 import type { MarketAnalysis } from '@/lib/audience/market-analysis';
+import { formatZipDisplay, formatZipDisplayTitle } from '@/lib/map/zip-labels';
+import type { ZipLabel } from '@/lib/map/zip-labels';
 import type { DealershipRow } from '@/lib/dealership/types';
 import type { AccentSource, RadiusMiles } from '@/lib/projects/settings';
 import { fillColor, hexToRgb } from '@/lib/map/colors';
@@ -41,6 +43,7 @@ interface Props {
   onToggleCompetitorLayer: (visible: boolean) => void;
   onToggleRadiusLayer: (visible: boolean) => void;
   marketAnalysis: MarketAnalysis | null;
+  zipLabels: Record<string, ZipLabel>;
   hasFocusDealership: boolean;
   onCollapse?: () => void;
 }
@@ -126,6 +129,7 @@ export function MapSidebar({
   onToggleCompetitorLayer,
   onToggleRadiusLayer,
   marketAnalysis,
+  zipLabels,
   hasFocusDealership,
   onCollapse,
 }: Props) {
@@ -354,10 +358,15 @@ export function MapSidebar({
               </p>
               <ul className="space-y-1.5">
                 {marketAnalysis.topZips.map((z, i) => (
-                  <li key={z.zip} className="flex items-center justify-between text-[13px]">
-                    <span className="text-[var(--muted)] tnum">
-                      <span className="inline-block w-5 text-[var(--faint)]">{i + 1}</span>
-                      {z.zip}
+                  <li key={z.zip} className="flex items-center justify-between gap-3 text-[13px]">
+                    <span className="min-w-0 flex-1 text-[var(--muted)]">
+                      <span className="inline-block w-5 text-[var(--faint)] tnum">{i + 1}</span>
+                      <span
+                        className="font-medium text-[var(--ink-2)] truncate"
+                        title={formatZipDisplayTitle(z.zip, zipLabels)}
+                      >
+                        {formatZipDisplay(z.zip, zipLabels)}
+                      </span>
                     </span>
                     <span className="font-semibold text-[var(--ink)] tnum">
                       {formatNumber(z.count)}
@@ -378,9 +387,13 @@ export function MapSidebar({
               </p>
               <ul className="space-y-1.5">
                 {marketAnalysis.whiteSpace.map(z => (
-                  <li key={z.zip} className="flex items-center justify-between text-[13px]">
-                    <span className="font-medium tnum" style={{ color: 'var(--accent)' }}>
-                      {z.zip}
+                  <li key={z.zip} className="flex items-center justify-between gap-3 text-[13px]">
+                    <span
+                      className="min-w-0 flex-1 truncate font-medium tnum"
+                      style={{ color: 'var(--accent)' }}
+                      title={formatZipDisplayTitle(z.zip, zipLabels)}
+                    >
+                      {formatZipDisplay(z.zip, zipLabels)}
                     </span>
                     <span className="font-semibold text-[var(--ink)] tnum">
                       {formatNumber(z.count)}

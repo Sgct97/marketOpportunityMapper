@@ -56,7 +56,7 @@ export function CompetitorReview({
 
     const list = result.candidates ?? [];
     setCandidates(list);
-    setSelected(new Set(list.map(c => c.placeId)));
+    setSelected(new Set());
   }
 
   function toggle(placeId: string) {

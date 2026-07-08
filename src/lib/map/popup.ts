@@ -1,4 +1,6 @@
 import type { ZipSegmentMetric } from '@/lib/audience/zip-exclude';
+import { formatZipDisplay, formatZipDisplayTitle } from '@/lib/map/zip-labels';
+import type { ZipLabel } from '@/lib/map/zip-labels';
 import { formatNumber } from '@/lib/format';
 
 type PopupTheme = 'dark' | 'light';
@@ -68,10 +70,12 @@ export function audiencePopupHtml(options: {
   segments: ZipSegmentMetric[];
   excluded: boolean;
   theme?: PopupTheme;
+  zipLabels?: Record<string, ZipLabel>;
 }): string {
-  const { zip, count, accentColor, segments, excluded, theme = 'dark' } = options;
+  const { zip, count, accentColor, segments, excluded, theme = 'dark', zipLabels } = options;
   const palette = POPUP_THEME[theme];
-  const safeZip = escapeHtml(String(zip));
+  const zipHeading = escapeHtml(formatZipDisplay(zip, zipLabels));
+  const zipTitle = escapeHtml(formatZipDisplayTitle(zip, zipLabels));
   const total = count > 0 ? count : segments.reduce((sum, seg) => sum + seg.count, 0);
 
   const badgeStyle = excluded
@@ -80,7 +84,7 @@ export function audiencePopupHtml(options: {
 
   return `<div class="mom-popup-inner mom-popup-inner--zip" data-theme="${theme}" style="width:400px;max-width:min(400px,92vw);padding:12px 14px 11px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;box-sizing:border-box;overflow:hidden;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-      <span style="font-size:16px;font-weight:700;letter-spacing:0.04em;color:${palette.ink};font-variant-numeric:tabular-nums;">${safeZip}</span>
+      <span style="font-size:16px;font-weight:700;letter-spacing:0.02em;color:${palette.ink};font-variant-numeric:tabular-nums;" title="${zipTitle}">${zipHeading}</span>
       <span style="${badgeStyle}">${excluded ? 'Excluded' : 'Included'}</span>
     </div>
 

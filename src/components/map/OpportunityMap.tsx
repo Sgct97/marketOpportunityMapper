@@ -6,6 +6,7 @@ import type { FeatureCollection, Geometry } from 'geojson';
 import { aggregateAudienceByZip } from '@/lib/audience/aggregate';
 import type { AudienceZipRow } from '@/lib/audience/aggregate';
 import { segmentMetricsForZip } from '@/lib/audience/zip-exclude';
+import type { ZipLabel } from '@/lib/map/zip-labels';
 import type { DealershipRow } from '@/lib/dealership/types';
 import type { RadiusMiles } from '@/lib/projects/settings';
 import { resolveBasemapStyles, type MapTheme } from '@/lib/map/basemap';
@@ -37,6 +38,7 @@ interface Props {
   showCompetitorLayer: boolean;
   showRadiusLayer: boolean;
   excludedZips?: string[];
+  zipLabels?: Record<string, ZipLabel>;
   onToggleZipExcluded?: (zip: string) => void;
   onFocusDealership: (id: string) => void;
   /** When false the map is hidden (e.g. dashboard view); resize on re-show. */
@@ -197,6 +199,7 @@ export function OpportunityMap({
   showCompetitorLayer,
   showRadiusLayer,
   excludedZips = [],
+  zipLabels = {},
   onToggleZipExcluded,
   onFocusDealership,
   active = true,
@@ -216,6 +219,7 @@ export function OpportunityMap({
 
   const onToggleZipExcludedRef = useRef(onToggleZipExcluded);
   const excludedZipsRef = useRef(excludedZips);
+  const zipLabelsRef = useRef(zipLabels);
   const rowsRef = useRef(rows);
 
   const themeRef = useRef(theme);
@@ -226,9 +230,10 @@ export function OpportunityMap({
     onMapReadyRef.current = onMapReady;
     onToggleZipExcludedRef.current = onToggleZipExcluded;
     excludedZipsRef.current = excludedZips;
+    zipLabelsRef.current = zipLabels;
     rowsRef.current = rows;
     themeRef.current = theme;
-  }, [onFocusDealership, focusDealershipId, onMapReady, onToggleZipExcluded, excludedZips, rows, theme]);
+  }, [onFocusDealership, focusDealershipId, onMapReady, onToggleZipExcluded, excludedZips, zipLabels, rows, theme]);
 
   const [layersReady, setLayersReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -355,6 +360,7 @@ export function OpportunityMap({
               segments,
               excluded,
               theme: themeRef.current,
+              zipLabels: zipLabelsRef.current,
             })
           )
           .addTo(map);

@@ -58,6 +58,8 @@ export interface TradeAreaStats {
   zipsForHalf: number;
   /** Largest single segment within the trade area (a real, non-overlapping count). */
   leadSegment: SegmentTotal | null;
+  /** Per-segment totals scoped to ZIPs inside the radius. */
+  segments: SegmentTotal[];
 }
 
 export interface WhiteSpaceStats {
@@ -389,6 +391,8 @@ export function buildDashboardModel(input: DashboardInput): DashboardModel {
     // Largest single segment within the radius — a real headcount that doesn't
     // double-count people across segments, so it's safe to headline.
     const inRadiusZips = new Set(Object.keys(inRadius));
+    const tradeAreaRows = rows.filter(row => inRadiusZips.has(row.zip));
+    const tradeAreaSegments = segmentTotals(tradeAreaRows);
     const segInRadius = new Map<string, { total: number; zips: Set<string> }>();
     for (const row of rows) {
       if (!inRadiusZips.has(row.zip)) continue;
@@ -420,6 +424,7 @@ export function buildDashboardModel(input: DashboardInput): DashboardModel {
       top5Share: tradeConcentration.top5Share,
       zipsForHalf: tradeConcentration.zipsForHalf,
       leadSegment,
+      segments: tradeAreaSegments,
     };
   }
 
