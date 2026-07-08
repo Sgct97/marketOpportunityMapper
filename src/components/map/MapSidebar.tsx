@@ -15,6 +15,8 @@ interface Props {
   onClearAll: () => void;
   totalAudience: number;
   zipCount: number;
+  excludedZipCount: number;
+  onRestoreAllZips: () => void;
   maxCount: number;
   primaryColor: string;
   datasetLabel?: string | null;
@@ -98,6 +100,8 @@ export function MapSidebar({
   onClearAll,
   totalAudience,
   zipCount,
+  excludedZipCount,
+  onRestoreAllZips,
   maxCount,
   primaryColor,
   datasetLabel,
@@ -284,6 +288,33 @@ export function MapSidebar({
             );
           })}
         </div>
+      </div>
+
+      <div className="px-6 py-4 border-b border-[var(--line-soft)] space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[13px] font-semibold text-[var(--ink)]">ZIP curation</p>
+          {excludedZipCount > 0 && (
+            <button
+              type="button"
+              onClick={onRestoreAllZips}
+              className="text-[12px] font-medium text-[var(--accent)] hover:underline shrink-0"
+            >
+              Restore all
+            </button>
+          )}
+        </div>
+        <p className="text-[11px] text-[var(--faint)] leading-snug">
+          Click a ZIP on the map to include or exclude it from every metric, dashboard total, and
+          export.
+        </p>
+        {excludedZipCount > 0 && (
+          <p className="text-[12px] text-[var(--muted)]">
+            <span className="font-semibold text-[var(--ink)] tnum">
+              {formatNumber(excludedZipCount)}
+            </span>{' '}
+            ZIP{excludedZipCount === 1 ? '' : 's'} excluded
+          </p>
+        )}
       </div>
 
       <div className="px-6 py-4 border-b border-[var(--line-soft)]">

@@ -1,3 +1,5 @@
+import { parseExcludedZips } from '@/lib/audience/zip-exclude';
+
 export const RADIUS_MILES_OPTIONS = [10, 25, 50] as const;
 export type RadiusMiles = (typeof RADIUS_MILES_OPTIONS)[number];
 
@@ -15,6 +17,8 @@ export interface ProjectMapSettings {
   /** @deprecated use showClientDealershipLayer / showCompetitorLayer */
   showDealershipLayer?: boolean;
   showRadiusLayer?: boolean;
+  /** ZIP codes removed from trade-area metrics and map emphasis (persisted). */
+  excludedZips?: string[];
   clientDealerWebsite?: string | null;
   suggestedDealerName?: string | null;
   competitorBrand?: string | null;
@@ -48,6 +52,7 @@ export function parseProjectMapSettings(raw: unknown): ProjectMapSettings {
     showCompetitorLayer:
       s.showCompetitorLayer !== undefined ? s.showCompetitorLayer !== false : legacyLayers,
     showRadiusLayer: s.showRadiusLayer !== false,
+    excludedZips: parseExcludedZips(s.excludedZips),
     clientDealerWebsite:
       typeof s.clientDealerWebsite === 'string' ? s.clientDealerWebsite : undefined,
     suggestedDealerName:
@@ -66,5 +71,6 @@ export function defaultMapSettings(
     showClientDealershipLayer: true,
     showCompetitorLayer: true,
     showRadiusLayer: true,
+    excludedZips: [],
   };
 }

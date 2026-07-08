@@ -26,6 +26,9 @@ interface Props {
   active: boolean;
   theme: MapTheme;
   rows: AudienceZipRow[];
+  excludedZips: string[];
+  onToggleZipExcluded: (zip: string) => void;
+  onRestoreAllZips: () => void;
   selectedTypes: string[];
   primaryColor: string;
   typeLabel: string;
@@ -94,6 +97,8 @@ export function MapView(props: Props) {
         theme={props.theme}
         active={props.active}
         rows={props.rows}
+        excludedZips={props.excludedZips}
+        onToggleZipExcluded={props.onToggleZipExcluded}
         selectedTypes={props.selectedTypes}
         primaryColor={props.primaryColor}
         typeLabel={props.typeLabel}
@@ -130,6 +135,8 @@ export function MapView(props: Props) {
         onClearAll={props.onClearAll}
         totalAudience={props.totalAudience}
         zipCount={props.zipCount}
+        excludedZipCount={props.excludedZips.length}
+        onRestoreAllZips={props.onRestoreAllZips}
         maxCount={props.maxCount}
         primaryColor={props.primaryColor}
         datasetLabel={props.datasetLabel}

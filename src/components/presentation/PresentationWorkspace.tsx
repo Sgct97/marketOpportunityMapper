@@ -10,6 +10,10 @@ import type { AudienceZipRow } from '@/lib/audience/aggregate';
 import { buildDashboardModel } from '@/lib/audience/dashboard';
 import { computeMarketAnalysis } from '@/lib/audience/market-analysis';
 import {
+  filterRowsByExcludedZips,
+  toggleExcludedZip,
+} from '@/lib/audience/zip-exclude';
+import {
   clientDealerships,
   competitorDealerships,
 } from '@/lib/dealership/filter';
@@ -115,6 +119,12 @@ export function PresentationWorkspace({
     parsed.showCompetitorLayer !== false
   );
   const [showRadiusLayer, setShowRadiusLayer] = useState(parsed.showRadiusLayer !== false);
+  const [excludedZips, setExcludedZips] = useState<string[]>(parsed.excludedZips ?? []);
+
+  const activeRows = useMemo(
+    () => filterRowsByExcludedZips(rows, excludedZips),
+    [rows, excludedZips]
+  );
 
   const focusDealership = useMemo(
     () => clientOptions.find(d => d.id === focusDealershipId) ?? null,
@@ -144,8 +154,8 @@ export function PresentationWorkspace({
   const brand = accentSource === 'agency' ? agencyBrand : vehicleBrand;
 
   const aggregate = useMemo(
-    () => aggregateAudienceByZip(rows, selectedTypes),
-    [rows, selectedTypes]
+    () => aggregateAudienceByZip(activeRows, selectedTypes),
+    [activeRows, selectedTypes]
   );
 
   const typeLabel =
@@ -209,7 +219,7 @@ export function PresentationWorkspace({
   const dashboardModel = useMemo(
     () =>
       buildDashboardModel({
-        rows,
+        rows: activeRows,
         zipCentroids,
         focus: focusDealership
           ? { latitude: focusDealership.latitude, longitude: focusDealership.longitude }
@@ -217,7 +227,7 @@ export function PresentationWorkspace({
         radiusMiles,
         competitors: competitorOptions,
       }),
-    [rows, zipCentroids, focusDealership, radiusMiles, competitorOptions]
+    [activeRows, zipCentroids, focusDealership, radiusMiles, competitorOptions]
   );
 
   const persistSettings = useCallback(
@@ -318,6 +328,22 @@ export function PresentationWorkspace({
     persistSettings({ accentSource: source });
   }
 
+  const handleToggleZipExcluded = useCallback(
+    (zip: string) => {
+      setExcludedZips(prev => {
+        const next = toggleExcludedZip(prev, zip);
+        persistSettings({ excludedZips: next });
+        return next;
+      });
+    },
+    [persistSettings]
+  );
+
+  const handleRestoreAllZips = useCallback(() => {
+    setExcludedZips([]);
+    persistSettings({ excludedZips: [] });
+  }, [persistSettings]);
+
   const contextLabel = focusDealership
     ? `${focusDealership.name} · ${radiusMiles} mi radius`
     : datasetLabel;
@@ -362,6 +388,9 @@ export function PresentationWorkspace({
             active={view === 'map'}
             theme={theme}
             rows={rows}
+            excludedZips={excludedZips}
+            onToggleZipExcluded={handleToggleZipExcluded}
+            onRestoreAllZips={handleRestoreAllZips}
             selectedTypes={selectedTypes}
             primaryColor={accentColor}
             typeLabel={typeLabel}
