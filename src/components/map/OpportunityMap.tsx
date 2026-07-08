@@ -8,6 +8,7 @@ import type { AudienceZipRow } from '@/lib/audience/aggregate';
 import { segmentMetricsForZip } from '@/lib/audience/zip-exclude';
 import type { ZipLabel } from '@/lib/map/zip-labels';
 import type { DealershipRow } from '@/lib/dealership/types';
+import { rankedCompetitorsForProject } from '@/lib/dealership/rank-competitors';
 import type { RadiusMiles } from '@/lib/projects/settings';
 import { resolveBasemapStyles, type MapTheme } from '@/lib/map/basemap';
 import { choroplethFillPaint, choroplethLinePaint } from '@/lib/map/choropleth';
@@ -16,6 +17,7 @@ import { fetchZipBoundaries } from '@/lib/map/boundaries';
 import {
   CLIENT_DEALERSHIP_LAYER,
   COMPETITOR_DEALERSHIP_LAYER,
+  COMPETITOR_DEALERSHIP_LABEL_LAYER,
   DEALERSHIP_PIN_LAYERS,
   ensureDealershipLayers,
   setLayerVisibility,
@@ -24,6 +26,7 @@ import {
 import { dealershipPopupHtml } from '@/lib/map/dealership-popup';
 import { mergeAudienceIntoBoundaries } from '@/lib/map/geojson';
 import { audiencePopupHtml } from '@/lib/map/popup';
+import { CompetitorLegend } from '@/components/map/CompetitorLegend';
 
 interface Props {
   rows: AudienceZipRow[];
@@ -247,6 +250,11 @@ export function OpportunityMap({
     [rows, selectedTypes]
   );
 
+  const rankedCompetitors = useMemo(
+    () => rankedCompetitorsForProject(dealerships, focusDealershipId),
+    [dealerships, focusDealershipId]
+  );
+
   const zipsForBoundaries = useMemo(
     () =>
       aggregate.zips.filter(zip => (aggregate.byZip[zip] ?? 0) > 0).sort(),
@@ -417,6 +425,11 @@ export function OpportunityMap({
       const feature = e.features?.[0];
       if (!feature?.properties) return;
       const props = feature.properties;
+      const rankRaw = props.rank;
+      const rank =
+        rankRaw != null && rankRaw !== '' && !Number.isNaN(Number(rankRaw))
+          ? Number(rankRaw)
+          : undefined;
       popupRef.current
         ?.setLngLat(e.lngLat)
         .setHTML(
@@ -426,6 +439,7 @@ export function OpportunityMap({
             role: props.role === 'client' ? 'client' : 'competitor',
             accentColor: primaryColor,
             isFocus: String(props.id) === focusIdRef.current,
+            rank,
           })
         )
         .addTo(map);
@@ -526,7 +540,11 @@ export function OpportunityMap({
 
     setLayerVisibility(map, ['zip-fill', 'zip-outline'], showZipLayer);
     setLayerVisibility(map, [CLIENT_DEALERSHIP_LAYER], showClientDealershipLayer);
-    setLayerVisibility(map, [COMPETITOR_DEALERSHIP_LAYER], showCompetitorLayer);
+    setLayerVisibility(
+      map,
+      [COMPETITOR_DEALERSHIP_LAYER, COMPETITOR_DEALERSHIP_LABEL_LAYER],
+      showCompetitorLayer
+    );
     setLayerVisibility(map, ['radius-fill', 'radius-glow', 'radius-outline'], showRadiusLayer);
 
     updateDealershipSources(map, {
@@ -534,6 +552,7 @@ export function OpportunityMap({
       focusDealershipId,
       radiusMiles,
       showRadius: showRadiusLayer,
+      theme,
     });
   }, [
     layersReady,
@@ -544,6 +563,7 @@ export function OpportunityMap({
     showClientDealershipLayer,
     showCompetitorLayer,
     showRadiusLayer,
+    theme,
   ]);
 
   useEffect(() => {
@@ -672,6 +692,16 @@ export function OpportunityMap({
         <div className="mom-alert absolute top-14 left-4 right-4 z-10 max-w-md px-4 py-2.5 text-xs">
           {boundaryError}
         </div>
+      )}
+
+      {layersReady && showCompetitorLayer && rankedCompetitors.length > 0 && (
+        <CompetitorLegend
+          competitors={rankedCompetitors}
+          theme={theme}
+          className={`absolute left-0 z-10 rounded-none rounded-br-[11px] border-t-0 border-l-0 ${
+            boundaryLoading ? 'top-9' : 'top-0'
+          }`}
+        />
       )}
 
       {layersReady && !boundaryLoading && displayedFeatureCount > 0 && (

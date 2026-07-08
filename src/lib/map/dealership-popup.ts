@@ -12,9 +12,15 @@ export function dealershipPopupHtml(options: {
   role: 'client' | 'competitor';
   accentColor: string;
   isFocus?: boolean;
+  rank?: number;
 }): string {
-  const { name, brand, role, accentColor, isFocus } = options;
-  const roleLabel = role === 'client' ? 'Client dealership' : 'Competitor';
+  const { name, brand, role, accentColor, isFocus, rank } = options;
+  const roleLabel =
+    role === 'client'
+      ? 'Client dealership'
+      : rank != null
+        ? `Competitor #${rank}`
+        : 'Competitor';
   const safeName = escapeHtml(name);
   const safeBrand = escapeHtml(brand);
 

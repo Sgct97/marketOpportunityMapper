@@ -1,4 +1,5 @@
 import type { AgencyBrandConfig } from '@/lib/agency-brand';
+import type { MapTheme } from '@/lib/map/basemap';
 import { detectBrand } from '@/lib/dealership/infer-client';
 
 /**
@@ -209,6 +210,67 @@ function shade(hex: string, amount: number): string {
 function rgba(hex: string, alpha: number): string {
   const [r, g, b] = toRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/** Pick black/white text for contrast against a background color. */
+export function readableOnBackground(hex: string): string {
+  return readableOn(hex);
+}
+
+/** Resolve a dealership brand string to a curated OEM accent, if known. */
+export function resolveOemBrandConfig(brandName: string): BrandConfig | null {
+  const trimmed = brandName.trim();
+  if (!trimmed) return null;
+
+  const detected = detectBrand(trimmed);
+  if (detected && OEM_ACCENTS[detected]) {
+    return buildBrand(slugify(detected), detected, OEM_ACCENTS[detected]!);
+  }
+
+  const exact = Object.keys(OEM_ACCENTS).find(
+    key => key.toLowerCase() === trimmed.toLowerCase()
+  );
+  if (exact) {
+    return buildBrand(slugify(exact), exact, OEM_ACCENTS[exact]!);
+  }
+
+  return null;
+}
+
+/** Vivid pin colors for unknown brands — still distinct per name. */
+const COMPETITOR_FALLBACK_PIN_PALETTE = [
+  '#FF6A5C',
+  '#7FC65C',
+  '#5C9BFF',
+  '#D8B477',
+  '#FF4D6E',
+  '#79E0C8',
+  '#C48F8F',
+  '#B08CC4',
+];
+
+function hashBrandName(brand: string): number {
+  let hash = 0;
+  for (let i = 0; i < brand.length; i++) {
+    hash = (hash * 31 + brand.toLowerCase().charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+/** Pin fill for a competitor — OEM glow on dark maps, true brand hue on light. */
+export function competitorPinColor(brandName: string, theme: MapTheme = 'dark'): string {
+  const config = resolveOemBrandConfig(brandName);
+  if (config) {
+    return theme === 'light' ? config.primaryColor : config.glow;
+  }
+  return COMPETITOR_FALLBACK_PIN_PALETTE[
+    hashBrandName(brandName) % COMPETITOR_FALLBACK_PIN_PALETTE.length
+  ]!;
+}
+
+/** Number label color that contrasts with the pin fill. */
+export function competitorPinLabelColor(pinColor: string): string {
+  return readableOn(pinColor);
 }
 
 /** Pick black/white text for contrast against a background color. */

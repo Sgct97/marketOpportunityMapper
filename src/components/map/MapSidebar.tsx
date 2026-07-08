@@ -443,8 +443,10 @@ export function MapSidebar({
             Client
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#9FB1C9] border border-[rgba(7,11,21,0.9)] shadow-sm" />
-            Competitor
+            <span className="flex h-2.5 w-2.5 items-center justify-center rounded-full bg-[#9FB1C9] border border-[rgba(7,11,21,0.9)] text-[7px] font-bold text-white shadow-sm">
+              #
+            </span>
+            Competitor (numbered, colored by brand)
           </span>
         </div>
       </div>
