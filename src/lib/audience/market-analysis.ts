@@ -1,3 +1,4 @@
+import { TOP_ZIP_DISPLAY_COUNT } from '@/lib/audience/presentation-limits';
 import type { DealershipRow } from '@/lib/dealership/types';
 import type { LatLng } from '@/lib/map/centroids';
 import { distanceMiles } from '@/lib/map/radius';
@@ -64,7 +65,7 @@ function nearestCompetitorMiles(
 
 export function topZipsByAudience(
   byZip: Record<string, number>,
-  limit = 5
+  limit = TOP_ZIP_DISPLAY_COUNT
 ): ZipAudienceRank[] {
   return Object.entries(byZip)
     .filter(([, count]) => count > 0)
@@ -129,7 +130,7 @@ export function whiteSpaceZips(options: {
     competitors,
     competitorWithinMiles,
     minCountRatio = 0.25,
-    limit = 8,
+    limit = TOP_ZIP_DISPLAY_COUNT,
   } = options;
 
   const compPoints = mappableCompetitors(competitors);
@@ -186,7 +187,7 @@ export function computeMarketAnalysis(options: {
     zipsInRadius: zipCount,
     radiusShare: marketTotal > 0 ? audienceTotal / marketTotal : 0,
     centroidsResolved,
-    topZips: topZipsByAudience(rankSource, options.topZipLimit ?? 5),
+    topZips: topZipsByAudience(rankSource, options.topZipLimit ?? TOP_ZIP_DISPLAY_COUNT),
     topZipsScope: scopeToRadius ? 'trade-area' : 'market',
     whiteSpace: whiteSpaceZips({
       byZip: rankSource,

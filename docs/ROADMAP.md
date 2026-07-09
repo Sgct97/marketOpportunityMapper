@@ -40,7 +40,7 @@ Original calendar targets (June 6–9 MVP) are superseded by actual start date; 
 - Geocode rows missing lat/lng (on upload queue + import summary)
 - Brand filter; dealership layer toggle
 - **Focus client dealership** (center map, drive summaries)
-- Radius rings: 10 / 25 / 50 miles
+- Radius rings: 10 / 15 / 20 / 25 miles
 - Summary cards: total audience, top ZIPs, audience inside radius
 - **White-space (MVP-lite):** highlight/list high-audience ZIPs with no competitor within X mi
 - Presentation UI polish (live pitch: simple controls, layer toggles)

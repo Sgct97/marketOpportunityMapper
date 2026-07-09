@@ -1,4 +1,5 @@
 import type { AudienceZipRow } from '@/lib/audience/aggregate';
+import { TOP_ZIP_DISPLAY_COUNT } from '@/lib/audience/presentation-limits';
 import type { DealershipRow } from '@/lib/dealership/types';
 import type { LatLng } from '@/lib/map/centroids';
 import { distanceMiles } from '@/lib/map/radius';
@@ -156,7 +157,7 @@ function concentration(byZip: Record<string, number>, total: number): Concentrat
   }
 
   return {
-    topZips: rankZips(byZip, total, 8),
+    topZips: rankZips(byZip, total, TOP_ZIP_DISPLAY_COUNT),
     top5Share: share(sumFirst(5), total),
     top10Share: share(sumFirst(10), total),
     zipsForHalf,
@@ -184,7 +185,11 @@ const FACET_STOPWORDS = new Set([
 
 /** Tokenize a segment name into meaningful, de-duplicated words. */
 export function facetTokens(name: string): string[] {
-  const lower = name.toLowerCase();
+  const lower = name
+    .toLowerCase()
+    // Align legacy + normalized demographic labels for composition grouping.
+    .replace(/\bnon\s*[-–—]?\s*hispanic\b/g, 'general-market')
+    .replace(/\bgeneral\s+market\b/g, 'general-market');
   // Keep "non-x" as a single token so "Non-Hispanic" never counts as "Hispanic".
   const collapsed = lower.replace(/non[-\s]*([a-z]+)/g, 'non-$1');
   const tokens = new Set<string>();
@@ -197,6 +202,7 @@ export function facetTokens(name: string): string[] {
 }
 
 function prettyToken(token: string): string {
+  if (token === 'general-market') return 'General Market';
   return token
     .split('-')
     .map(p => (p ? p.charAt(0).toUpperCase() + p.slice(1) : p))
@@ -458,7 +464,7 @@ export function buildDashboardModel(input: DashboardInput): DashboardModel {
     competitive: {
       competitorCount: compPoints.length,
       competitorBrands: competitorBrandList(competitors),
-      whiteSpace: whiteSpace.slice(0, 8),
+      whiteSpace: whiteSpace.slice(0, TOP_ZIP_DISPLAY_COUNT),
     },
   };
 }

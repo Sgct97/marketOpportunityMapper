@@ -9,6 +9,7 @@ import type { MapTheme } from '@/lib/map/basemap';
 import type { DealershipRow } from '@/lib/dealership/types';
 import type { AccentSource, RadiusMiles } from '@/lib/projects/settings';
 import type { ZipLabel } from '@/lib/map/zip-labels';
+import type { LatLng } from '@/lib/map/centroids';
 import { MapSidebar } from './MapSidebar';
 
 const OpportunityMap = dynamic(
@@ -28,6 +29,7 @@ interface Props {
   theme: MapTheme;
   rows: AudienceZipRow[];
   zipLabels: Record<string, ZipLabel>;
+  zipCentroids: Record<string, LatLng>;
   excludedZips: string[];
   onToggleZipExcluded: (zip: string) => void;
   onRestoreAllZips: () => void;
@@ -100,6 +102,7 @@ export function MapView(props: Props) {
         active={props.active}
         rows={props.rows}
         zipLabels={props.zipLabels}
+        zipCentroids={props.zipCentroids}
         excludedZips={props.excludedZips}
         onToggleZipExcluded={props.onToggleZipExcluded}
         selectedTypes={props.selectedTypes}

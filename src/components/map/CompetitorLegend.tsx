@@ -35,7 +35,7 @@ export function CompetitorLegend({ competitors, theme = 'dark', className = '' }
       <ol className="max-h-32 overflow-y-auto py-1">
         {competitors.map(c => {
           const distance = formatDistance(c.distanceMiles);
-          const pinColor = competitorPinColor(c.brand, theme);
+          const pinColor = competitorPinColor(c.brand, theme, c.name);
           const labelColor = competitorPinLabelColor(pinColor);
           return (
             <li

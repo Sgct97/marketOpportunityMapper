@@ -5,6 +5,7 @@ import { clientDealerships, competitorDealerships } from '@/lib/dealership/filte
 import { rankCompetitors } from '@/lib/dealership/rank-competitors';
 import type { DealershipRow } from '@/lib/dealership/types';
 import type { MapTheme } from '@/lib/map/basemap';
+import { CLIENT_STAR_IMAGE_ID, ensureClientStarImage } from '@/lib/map/client-star-icon';
 import { circlePolygonCoordinates } from '@/lib/map/radius';
 
 interface DealershipProperties {
@@ -20,10 +21,12 @@ interface DealershipProperties {
 
 export const CLIENT_DEALERSHIP_SOURCE = 'client-dealerships';
 export const COMPETITOR_DEALERSHIP_SOURCE = 'competitor-dealerships';
+export const CLIENT_DEALERSHIP_HALO_LAYER = 'client-dealership-halo';
 export const CLIENT_DEALERSHIP_LAYER = 'client-dealership-pins';
 export const COMPETITOR_DEALERSHIP_LAYER = 'competitor-dealership-pins';
 export const COMPETITOR_DEALERSHIP_LABEL_LAYER = 'competitor-dealership-labels';
 export const DEALERSHIP_PIN_LAYERS: string[] = [
+  CLIENT_DEALERSHIP_HALO_LAYER,
   CLIENT_DEALERSHIP_LAYER,
   COMPETITOR_DEALERSHIP_LAYER,
   COMPETITOR_DEALERSHIP_LABEL_LAYER,
@@ -66,7 +69,7 @@ function rankedCompetitorsToGeoJson(
 
   for (const d of ranked) {
     if (d.latitude == null || d.longitude == null) continue;
-    const pinColor = competitorPinColor(d.brand, theme);
+    const pinColor = competitorPinColor(d.brand, theme, d.name);
     features.push({
       type: 'Feature',
       properties: {
@@ -130,6 +133,58 @@ export function radiusToGeoJson(
 function removeLegacyDealershipLayer(map: maplibregl.Map) {
   if (map.getLayer(LEGACY_DEALERSHIP_LAYER)) {
     map.removeLayer(LEGACY_DEALERSHIP_LAYER);
+  }
+}
+
+function removeLegacyClientDealershipLayer(map: maplibregl.Map) {
+  const layer = map.getLayer(CLIENT_DEALERSHIP_LAYER);
+  if (layer?.type === 'circle') {
+    map.removeLayer(CLIENT_DEALERSHIP_LAYER);
+  }
+}
+
+function ensureClientDealershipHalo(map: maplibregl.Map, clientColor: string) {
+  if (!map.getLayer(CLIENT_DEALERSHIP_HALO_LAYER)) {
+    map.addLayer({
+      id: CLIENT_DEALERSHIP_HALO_LAYER,
+      type: 'circle',
+      source: CLIENT_DEALERSHIP_SOURCE,
+      filter: ['==', ['get', 'focused'], true],
+      paint: {
+        'circle-color': clientColor,
+        'circle-radius': 15,
+        'circle-opacity': 0.22,
+        'circle-blur': 0.55,
+      },
+    });
+  } else {
+    map.setPaintProperty(CLIENT_DEALERSHIP_HALO_LAYER, 'circle-color', clientColor);
+  }
+}
+
+function ensureClientDealershipStar(map: maplibregl.Map, clientColor: string) {
+  ensureClientStarImage(map, clientColor);
+  removeLegacyClientDealershipLayer(map);
+
+  const clientStarLayout: maplibregl.SymbolLayout = {
+    'icon-image': CLIENT_STAR_IMAGE_ID,
+    'icon-size': ['case', ['boolean', ['get', 'focused'], false], 1.08, 0.86],
+    'icon-allow-overlap': true,
+    'icon-ignore-placement': true,
+  };
+
+  if (!map.getLayer(CLIENT_DEALERSHIP_LAYER)) {
+    map.addLayer({
+      id: CLIENT_DEALERSHIP_LAYER,
+      type: 'symbol',
+      source: CLIENT_DEALERSHIP_SOURCE,
+      layout: clientStarLayout,
+    });
+  } else {
+    for (const [key, value] of Object.entries(clientStarLayout)) {
+      map.setLayoutProperty(CLIENT_DEALERSHIP_LAYER, key, value);
+    }
+    map.moveLayer(CLIENT_DEALERSHIP_LAYER);
   }
 }
 
@@ -198,20 +253,7 @@ export function ensureDealershipLayers(map: maplibregl.Map, clientColor: string)
     });
   }
 
-  if (!map.getLayer(CLIENT_DEALERSHIP_LAYER)) {
-    map.addLayer({
-      id: CLIENT_DEALERSHIP_LAYER,
-      type: 'circle',
-      source: CLIENT_DEALERSHIP_SOURCE,
-      paint: {
-        'circle-color': clientColor,
-        'circle-radius': ['case', ['boolean', ['get', 'focused'], false], 11, 8],
-        'circle-stroke-width': ['case', ['boolean', ['get', 'focused'], false], 3, 2],
-        'circle-stroke-color': '#FFFFFF',
-        'circle-opacity': 0.95,
-      },
-    });
-  }
+  ensureClientDealershipHalo(map, clientColor);
 
   if (!map.getLayer(COMPETITOR_DEALERSHIP_LAYER)) {
     map.addLayer({
@@ -245,6 +287,8 @@ export function ensureDealershipLayers(map: maplibregl.Map, clientColor: string)
       map.setPaintProperty(COMPETITOR_DEALERSHIP_LABEL_LAYER, key, value);
     }
   }
+
+  ensureClientDealershipStar(map, clientColor);
 }
 
 export function setLayerVisibility(

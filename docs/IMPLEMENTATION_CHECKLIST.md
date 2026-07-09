@@ -44,7 +44,7 @@ Track build progress against [ROADMAP.md](./ROADMAP.md) and [DECISIONS.md](./DEC
 - [ ] Client vs competitor pin styles
 - [ ] Brand filter + dealership layer toggle
 - [ ] Focus client dealership (select, center map)
-- [ ] Radius rings: 10 / 25 / 50 miles
+- [ ] Radius rings: 10 / 15 / 20 / 25 miles
 - [ ] Summary: total audience, top ZIPs, audience in radius
 - [ ] White-space-lite highlights + list
 - [ ] Map workspace layout (sidebar + full map)

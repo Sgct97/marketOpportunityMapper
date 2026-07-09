@@ -6,7 +6,9 @@ import type { FeatureCollection, Geometry } from 'geojson';
 import { aggregateAudienceByZip } from '@/lib/audience/aggregate';
 import type { AudienceZipRow } from '@/lib/audience/aggregate';
 import { segmentMetricsForZip } from '@/lib/audience/zip-exclude';
+import { zipsWithinRadius } from '@/lib/audience/market-analysis';
 import type { ZipLabel } from '@/lib/map/zip-labels';
+import type { LatLng } from '@/lib/map/centroids';
 import type { DealershipRow } from '@/lib/dealership/types';
 import { rankedCompetitorsForProject } from '@/lib/dealership/rank-competitors';
 import type { RadiusMiles } from '@/lib/projects/settings';
@@ -15,6 +17,7 @@ import { choroplethFillPaint, choroplethLinePaint } from '@/lib/map/choropleth';
 import { hexToRgb } from '@/lib/map/colors';
 import { fetchZipBoundaries } from '@/lib/map/boundaries';
 import {
+  CLIENT_DEALERSHIP_HALO_LAYER,
   CLIENT_DEALERSHIP_LAYER,
   COMPETITOR_DEALERSHIP_LAYER,
   COMPETITOR_DEALERSHIP_LABEL_LAYER,
@@ -41,6 +44,7 @@ interface Props {
   showCompetitorLayer: boolean;
   showRadiusLayer: boolean;
   excludedZips?: string[];
+  zipCentroids?: Record<string, LatLng>;
   zipLabels?: Record<string, ZipLabel>;
   onToggleZipExcluded?: (zip: string) => void;
   onFocusDealership: (id: string) => void;
@@ -202,6 +206,7 @@ export function OpportunityMap({
   showCompetitorLayer,
   showRadiusLayer,
   excludedZips = [],
+  zipCentroids = {},
   zipLabels = {},
   onToggleZipExcluded,
   onFocusDealership,
@@ -261,14 +266,34 @@ export function OpportunityMap({
     [aggregate]
   );
 
+  const tradeAreaZipSet = useMemo((): ReadonlySet<string> | null => {
+    const focus = dealerships.find(d => d.id === focusDealershipId);
+    if (focus?.latitude == null || focus?.longitude == null) return null;
+
+    const { inRadius, centroidsResolved } = zipsWithinRadius({
+      byZip: aggregate.byZip,
+      zipCentroids,
+      focusLat: focus.latitude,
+      focusLng: focus.longitude,
+      radiusMiles,
+    });
+
+    // Wait until centroids load before hiding out-of-radius ZIPs.
+    if (centroidsResolved === 0) return null;
+
+    return new Set(Object.keys(inRadius));
+  }, [dealerships, focusDealershipId, zipCentroids, aggregate.byZip, radiusMiles]);
+
   const activeMaxCount = useMemo(() => {
     const excluded = new Set(excludedZips);
     let max = 0;
     for (const [zip, count] of Object.entries(aggregate.byZip)) {
-      if (!excluded.has(zip) && count > max) max = count;
+      if (excluded.has(zip)) continue;
+      if (tradeAreaZipSet && !tradeAreaZipSet.has(zip)) continue;
+      if (count > max) max = count;
     }
     return max || 1;
-  }, [aggregate.byZip, excludedZips]);
+  }, [aggregate.byZip, excludedZips, tradeAreaZipSet]);
 
   const isEmptySelection =
     selectedTypes.length === 0 || zipsForBoundaries.length === 0;
@@ -284,6 +309,7 @@ export function OpportunityMap({
     byZip: aggregate.byZip,
     typeLabel,
     excludedZips,
+    tradeAreaZipSet: null as ReadonlySet<string> | null,
   });
 
   useEffect(() => {
@@ -294,12 +320,20 @@ export function OpportunityMap({
       byZip: aggregate.byZip,
       typeLabel,
       excludedZips,
+      tradeAreaZipSet,
     };
-  }, [activeMaxCount, rgb, theme, aggregate.byZip, typeLabel, excludedZips]);
+  }, [activeMaxCount, rgb, theme, aggregate.byZip, typeLabel, excludedZips, tradeAreaZipSet]);
 
   const applyZipLayerData = useCallback((map: maplibregl.Map, rawBoundaries: FeatureCollection<Geometry>) => {
-    const { activeMaxCount: max, rgb: layerRgb, theme: layerTheme, byZip, typeLabel: label, excludedZips: excluded } =
-      zipLayerStyleRef.current;
+    const {
+      activeMaxCount: max,
+      rgb: layerRgb,
+      theme: layerTheme,
+      byZip,
+      typeLabel: label,
+      excludedZips: excluded,
+      tradeAreaZipSet: scopeZips,
+    } = zipLayerStyleRef.current;
 
     ensureZipLayers(map, layerRgb, max, layerTheme);
     applyChoroplethPaint(map, layerRgb, max, layerTheme);
@@ -308,7 +342,8 @@ export function OpportunityMap({
       rawBoundaries as FeatureCollection<Geometry, { ZCTA5?: string }>,
       byZip,
       label,
-      excluded
+      excluded,
+      scopeZips
     );
 
     const source = map.getSource('zip-areas') as maplibregl.GeoJSONSource | undefined;
@@ -539,7 +574,7 @@ export function OpportunityMap({
     if (!map || !layersReady) return;
 
     setLayerVisibility(map, ['zip-fill', 'zip-outline'], showZipLayer);
-    setLayerVisibility(map, [CLIENT_DEALERSHIP_LAYER], showClientDealershipLayer);
+    setLayerVisibility(map, [CLIENT_DEALERSHIP_LAYER, CLIENT_DEALERSHIP_HALO_LAYER], showClientDealershipLayer);
     setLayerVisibility(
       map,
       [COMPETITOR_DEALERSHIP_LAYER, COMPETITOR_DEALERSHIP_LABEL_LAYER],
@@ -656,6 +691,7 @@ export function OpportunityMap({
     aggregate.byZip,
     typeLabel,
     excludedZips,
+    tradeAreaZipSet,
     rgb,
     theme,
   ]);

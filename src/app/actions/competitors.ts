@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { canonicalizeOemBrand } from '@/lib/brands';
 import { dedupeCompetitors } from '@/lib/geocode/dedupe';
 import { searchCompetitorDealers } from '@/lib/geocode/google-places';
 import type { CompetitorCandidate } from '@/lib/geocode/types';
@@ -90,7 +91,7 @@ export async function saveCompetitorSelection(
 
     const clientRow = (client as DealershipRow | null) ?? null;
 
-    const normalizedBrand = brand.trim();
+    const normalizedBrand = canonicalizeOemBrand(brand.trim()) ?? brand.trim();
     if (!normalizedBrand) return { error: 'Brand is required.' };
 
     const filtered = selected.filter(

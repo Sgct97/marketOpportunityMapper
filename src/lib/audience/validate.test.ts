@@ -26,6 +26,24 @@ describe('normalizeAudienceType', () => {
       'Hispanic HYUNDAI Intenders'
     );
   });
+
+  it('rewrites non-Hispanic demographic labels to General Market', () => {
+    expect(normalizeAudienceType('Non-Hispanic HYUNDAI/KIA Owners')).toBe(
+      'General Market HYUNDAI/KIA Owners'
+    );
+    expect(normalizeAudienceType('Non- Hispanic NISSAN Intenders')).toBe(
+      'General Market NISSAN Intenders'
+    );
+    expect(normalizeAudienceType('NON HISPANIC Toyota Owners')).toBe(
+      'General Market Toyota Owners'
+    );
+  });
+
+  it('leaves Hispanic segments unchanged', () => {
+    expect(normalizeAudienceType('Hispanic HYUNDAI Intenders')).toBe(
+      'Hispanic HYUNDAI Intenders'
+    );
+  });
 });
 
 describe('validateAudienceRows — long format', () => {
@@ -122,5 +140,19 @@ describe('validateAudienceRows — wide format', () => {
   it('skips zero counts in wide format', () => {
     const { records } = validateAudienceRows([hyundaiRow], 'hyundai.xlsx');
     expect(records.find(r => r.audienceType.includes('KIA'))).toBeUndefined();
+  });
+
+  it('normalizes non-Hispanic wide column headers to General Market', () => {
+    const { records, summary } = validateAudienceRows(
+      [
+        {
+          ZIP: '90632',
+          '•Non-Hispanic HYUNDAI Owners': '12',
+        },
+      ],
+      'wide.xlsx'
+    );
+    expect(summary.audienceTypes).toEqual(['General Market HYUNDAI Owners']);
+    expect(records[0]?.audienceType).toBe('General Market HYUNDAI Owners');
   });
 });

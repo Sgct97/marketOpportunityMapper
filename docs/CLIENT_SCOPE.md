@@ -54,10 +54,10 @@ Source: client scope email. Maps each ask to MVP, Phase 2 (~15h), or later.
 | --- | --- | --- |
 | Audience concentration near competitors | MVP | Audience in radius; competitors on map |
 | White space opportunities | MVP-lite | High-audience ZIPs, no nearby competitor |
-| Radius overlap between dealerships | MVP | 10 / 25 / 50 mi rings |
+| Radius overlap between dealerships | MVP | 10 / 15 / 20 / 25 mi rings |
 | High-density opportunity zones | MVP | Heatmap + top ZIPs + white-space list |
 | Drive-time overlays | Later | |
-| Radius rings 10 / 25 / 50 mi | MVP | |
+| Radius rings 10 / 15 / 20 / 25 mi | MVP | |
 | Territory comparisons | Later | |
 
 ## Presentation / sales UI

@@ -37,6 +37,17 @@ const META_HEADERS = new Set([
   'fips',
 ]);
 
+/** Matches loose spellings: "Non-Hispanic", "Non Hispanic", "NON-HISPANIC", etc. */
+const NON_HISPANIC_RE = /\bnon\s*[-–—]?\s*hispanic\b/gi;
+
+/**
+ * Rewrite non-Hispanic demographic labels to "General Market" for presentation.
+ * Hispanic segments are left unchanged.
+ */
+export function normalizeDemographicLabel(name: string): string {
+  return name.replace(NON_HISPANIC_RE, 'General Market').replace(/\s+/g, ' ').trim();
+}
+
 export function normalizeZip(raw: unknown): string | null {
   const s = String(raw ?? '').trim();
   const fiveDigit = s.match(/\d{5}/);
@@ -52,10 +63,12 @@ export function normalizeZip(raw: unknown): string | null {
 }
 
 export function normalizeAudienceType(name: string): string {
-  return name
-    .replace(/^[\s•·\u2022]+/u, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return normalizeDemographicLabel(
+    name
+      .replace(/^[\s•·\u2022]+/u, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 function findColumnKey(row: Record<string, string>, candidates: string[]): string | null {

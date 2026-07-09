@@ -217,24 +217,68 @@ export function readableOnBackground(hex: string): string {
   return readableOn(hex);
 }
 
-/** Resolve a dealership brand string to a curated OEM accent, if known. */
-export function resolveOemBrandConfig(brandName: string): BrandConfig | null {
-  const trimmed = brandName.trim();
-  if (!trimmed) return null;
+function normalizeBrandToken(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
 
-  const detected = detectBrand(trimmed);
-  if (detected && OEM_ACCENTS[detected]) {
-    return buildBrand(slugify(detected), detected, OEM_ACCENTS[detected]!);
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i]![0] = i;
+  for (let j = 0; j <= n; j++) dp[0]![j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i]![j] = Math.min(dp[i - 1]![j]! + 1, dp[i]![j - 1]! + 1, dp[i - 1]![j - 1]! + cost);
+    }
   }
+  return dp[m]![n]!;
+}
 
-  const exact = Object.keys(OEM_ACCENTS).find(
-    key => key.toLowerCase() === trimmed.toLowerCase()
-  );
-  if (exact) {
-    return buildBrand(slugify(exact), exact, OEM_ACCENTS[exact]!);
+function fuzzyMatchOem(token: string): string | null {
+  if (token.length < 3) return null;
+  let best: string | null = null;
+  let bestDistance = 2;
+  for (const oem of Object.keys(OEM_ACCENTS)) {
+    const distance = levenshtein(token, normalizeBrandToken(oem));
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = oem;
+    }
+  }
+  return bestDistance <= 1 ? best : null;
+}
+
+/**
+ * Resolve a loose brand label (or dealership name hint) to a canonical OEM name.
+ * Handles substring matches, exact labels, and one-character typos like "Nisan".
+ */
+export function canonicalizeOemBrand(brandName: string, hintText?: string): string | null {
+  for (const text of [brandName, hintText ?? '']) {
+    const trimmed = text.trim();
+    if (!trimmed) continue;
+
+    const detected = detectBrand(trimmed);
+    if (detected) return detected;
+
+    const exact = Object.keys(OEM_ACCENTS).find(
+      key => key.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (exact) return exact;
+
+    const fuzzy = fuzzyMatchOem(normalizeBrandToken(trimmed));
+    if (fuzzy) return fuzzy;
   }
 
   return null;
+}
+
+/** Resolve a dealership brand string to a curated OEM accent, if known. */
+export function resolveOemBrandConfig(brandName: string, hintText?: string): BrandConfig | null {
+  const canonical = canonicalizeOemBrand(brandName, hintText);
+  if (!canonical || !OEM_ACCENTS[canonical]) return null;
+  return buildBrand(slugify(canonical), canonical, OEM_ACCENTS[canonical]!);
 }
 
 /** Vivid pin colors for unknown brands — still distinct per name. */
@@ -258,13 +302,17 @@ function hashBrandName(brand: string): number {
 }
 
 /** Pin fill for a competitor — OEM glow on dark maps, true brand hue on light. */
-export function competitorPinColor(brandName: string, theme: MapTheme = 'dark'): string {
-  const config = resolveOemBrandConfig(brandName);
+export function competitorPinColor(
+  brandName: string,
+  theme: MapTheme = 'dark',
+  hintText?: string
+): string {
+  const config = resolveOemBrandConfig(brandName, hintText);
   if (config) {
     return theme === 'light' ? config.primaryColor : config.glow;
   }
   return COMPETITOR_FALLBACK_PIN_PALETTE[
-    hashBrandName(brandName) % COMPETITOR_FALLBACK_PIN_PALETTE.length
+    hashBrandName(brandName || hintText || 'unknown') % COMPETITOR_FALLBACK_PIN_PALETTE.length
   ]!;
 }
 

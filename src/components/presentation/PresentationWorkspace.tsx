@@ -14,6 +14,10 @@ import {
   toggleExcludedZip,
 } from '@/lib/audience/zip-exclude';
 import {
+  buildReachScopeCopy,
+  filterRowsBySelectedTypes,
+} from '@/lib/audience/presentation-scope';
+import {
   clientDealerships,
   competitorDealerships,
 } from '@/lib/dealership/filter';
@@ -127,6 +131,16 @@ export function PresentationWorkspace({
     [rows, excludedZips]
   );
 
+  const mapScopeRows = useMemo(
+    () => filterRowsBySelectedTypes(activeRows, selectedTypes),
+    [activeRows, selectedTypes]
+  );
+
+  const reachScope = useMemo(
+    () => buildReachScopeCopy(selectedTypes.length, audienceTypes.length),
+    [selectedTypes.length, audienceTypes.length]
+  );
+
   const focusDealership = useMemo(
     () => clientOptions.find(d => d.id === focusDealershipId) ?? null,
     [clientOptions, focusDealershipId]
@@ -217,20 +231,20 @@ export function PresentationWorkspace({
     });
   }, [aggregate.byZip, zipCentroids, focusDealership, radiusMiles, competitorsForMap, selectedTypes.length]);
 
-  // Dashboard always uses the full dataset (all segments) and all competitors,
-  // independent of the map's filters.
+  // Dashboard and PDF use the same scope as the map: selected segments,
+  // excluded ZIPs, trade-area radius, and competitor layer visibility.
   const dashboardModel = useMemo(
     () =>
       buildDashboardModel({
-        rows: activeRows,
+        rows: mapScopeRows,
         zipCentroids,
         focus: focusDealership
           ? { latitude: focusDealership.latitude, longitude: focusDealership.longitude }
           : null,
         radiusMiles,
-        competitors: competitorOptions,
+        competitors: competitorsForMap,
       }),
-    [activeRows, zipCentroids, focusDealership, radiusMiles, competitorOptions]
+    [mapScopeRows, zipCentroids, focusDealership, radiusMiles, competitorsForMap]
   );
 
   const persistSettings = useCallback(
@@ -303,9 +317,11 @@ export function PresentationWorkspace({
       model: dashboardModel,
       mapImage: image,
       zipLabels,
+      reachScope,
+      competitorsInScope: showCompetitorLayer && competitorOptions.length > 0,
     });
     doc.save(`${slugify(projectName)}-market-report.pdf`);
-  }, [captureExportImage, brand, brandId, projectName, datasetLabel, focusDealership, radiusMiles, dashboardModel, zipLabels]);
+  }, [captureExportImage, brand, brandId, projectName, datasetLabel, focusDealership, radiusMiles, dashboardModel, zipLabels, reachScope, showCompetitorLayer, competitorOptions.length]);
 
   function toggleType(type: string) {
     setSelectedTypes(prev =>
@@ -393,6 +409,7 @@ export function PresentationWorkspace({
             theme={theme}
             rows={rows}
             zipLabels={zipLabels}
+            zipCentroids={zipCentroids}
             excludedZips={excludedZips}
             onToggleZipExcluded={handleToggleZipExcluded}
             onRestoreAllZips={handleRestoreAllZips}
@@ -458,6 +475,9 @@ export function PresentationWorkspace({
               datasetLabel={datasetLabel}
               focusName={focusDealership?.name ?? null}
               radiusMiles={radiusMiles}
+              reachScope={reachScope}
+              competitorsInScope={showCompetitorLayer && competitorOptions.length > 0}
+              excludedZipCount={excludedZips.length}
             />
           </div>
         )}

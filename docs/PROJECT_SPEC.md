@@ -27,7 +27,7 @@ Create a standalone, sales-friendly platform for visualizing addressable market 
 2. User uploads standardized audience file (drag-and-drop).
 3. System validates ZIP codes and audience counts; shows import summary.
 4. User uploads standardized dealership file (or geocodes addresses on import).
-5. User selects **focus client dealership**; optional radius rings (10 / 25 / 50 mi).
+5. User selects **focus client dealership**; optional radius rings (10 / 15 / 20 / 25 mi).
 6. User filters by audience type and dealership brand; toggles layers.
 7. User reviews competitive summaries (audience in radius, white-space highlights).
 8. User exports branded PDF.
@@ -72,7 +72,7 @@ Create a standalone, sales-friendly platform for visualizing addressable market 
 
 Client called this “one of the most important” areas. MVP delivers visual story **without** drive-time or auto API lookup:
 
-- Radius rings: 10, 25, 50 miles from focus dealership
+- Radius rings: 10, 15, 20, 25 miles from focus dealership
 - Layer toggles (ZIP heatmap, dealerships, rings)
 - Summary cards:
   - Total selected audience

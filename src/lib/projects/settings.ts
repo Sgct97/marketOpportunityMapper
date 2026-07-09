@@ -1,6 +1,6 @@
 import { parseExcludedZips } from '@/lib/audience/zip-exclude';
 
-export const RADIUS_MILES_OPTIONS = [10, 25, 50] as const;
+export const RADIUS_MILES_OPTIONS = [10, 15, 20, 25] as const;
 export type RadiusMiles = (typeof RADIUS_MILES_OPTIONS)[number];
 
 /** Which palette drives the map, dashboard, and exported report. */

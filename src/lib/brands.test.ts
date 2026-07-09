@@ -74,6 +74,14 @@ describe('competitorPinColor', () => {
     expect(a).toBe(b);
     expect(a).not.toBe(c);
   });
+
+  it('corrects common OEM typos like Nisan', () => {
+    expect(competitorPinColor('Nisan', 'dark')).toBe('#FF445F');
+  });
+
+  it('infers OEM color from the dealership name when brand is missing', () => {
+    expect(competitorPinColor('', 'dark', 'Fontana Nissan')).toBe('#FF445F');
+  });
 });
 
 describe('getBrand', () => {

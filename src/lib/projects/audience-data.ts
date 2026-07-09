@@ -1,5 +1,6 @@
-import { createDataClient } from '@/lib/supabase/data';
 import type { AudienceZipRow } from '@/lib/audience/aggregate';
+import { normalizeAudienceType } from '@/lib/audience/validate';
+import { createDataClient } from '@/lib/supabase/data';
 
 export interface ProjectAudiencePayload {
   projectId: string;
@@ -78,7 +79,7 @@ async function loadAllZipCounts(
     for (const r of data) {
       rows.push({
         zip: r.zip,
-        audience_type: r.audience_type,
+        audience_type: normalizeAudienceType(r.audience_type),
         audience_count: r.audience_count,
       });
     }

@@ -11,10 +11,10 @@ import type { DealershipRow } from '@/lib/dealership/types';
 
 const rows: AudienceZipRow[] = [
   { zip: '92336', audience_type: 'Hispanic HYUNDAI/KIA Intenders', audience_count: 600 },
-  { zip: '92336', audience_type: 'Non-Hispanic HYUNDAI/KIA Owners', audience_count: 400 },
-  { zip: '92336', audience_type: 'Non-Hispanic Auto service / maintenance shoppers', audience_count: 200 },
+  { zip: '92336', audience_type: 'General Market HYUNDAI/KIA Owners', audience_count: 400 },
+  { zip: '92336', audience_type: 'General Market Auto service / maintenance shoppers', audience_count: 200 },
   { zip: '91739', audience_type: 'Hispanic HYUNDAI/KIA Intenders', audience_count: 200 },
-  { zip: '91739', audience_type: 'Non-Hispanic HYUNDAI/KIA Owners', audience_count: 100 },
+  { zip: '91739', audience_type: 'General Market HYUNDAI/KIA Owners', audience_count: 100 },
   { zip: '90001', audience_type: 'Hispanic HYUNDAI/KIA Intenders', audience_count: 50 },
 ];
 
@@ -45,10 +45,12 @@ describe('totalsByZip', () => {
 });
 
 describe('facetTokens', () => {
-  it('keeps "non-hispanic" distinct from "hispanic"', () => {
-    expect(facetTokens('Non- Hispanic HYUNDAI/KIA Owners')).toContain('non-hispanic');
+  it('maps non-Hispanic variants to general-market and keeps Hispanic distinct', () => {
+    expect(facetTokens('Non- Hispanic HYUNDAI/KIA Owners')).toContain('general-market');
     expect(facetTokens('Non- Hispanic HYUNDAI/KIA Owners')).not.toContain('hispanic');
+    expect(facetTokens('General Market HYUNDAI/KIA Owners')).toContain('general-market');
     expect(facetTokens('Hispanic HYUNDAI/KIA Intenders')).toContain('hispanic');
+    expect(facetTokens('Hispanic HYUNDAI/KIA Intenders')).not.toContain('general-market');
   });
 
   it('splits slash-joined brands and drops filler words', () => {
@@ -63,16 +65,16 @@ describe('facetTokens', () => {
 const fontanaLike = segmentTotals([
   { zip: '1', audience_type: 'Hispanic HYUNDAI/KIA Intenders', audience_count: 600 },
   { zip: '1', audience_type: 'Hispanic HYUNDAI/KIA Owners', audience_count: 300 },
-  { zip: '1', audience_type: 'Non-Hispanic HYUNDAI/KIA Intenders', audience_count: 250 },
-  { zip: '1', audience_type: 'Non-Hispanic HYUNDAI/KIA Owners', audience_count: 350 },
+  { zip: '1', audience_type: 'General Market HYUNDAI/KIA Intenders', audience_count: 250 },
+  { zip: '1', audience_type: 'General Market HYUNDAI/KIA Owners', audience_count: 350 },
 ]);
 
 describe('discoverCompositionFacets', () => {
-  it('auto-discovers the Hispanic / Non-Hispanic split from segment names', () => {
+  it('auto-discovers the Hispanic / General Market split from segment names', () => {
     const facets = discoverCompositionFacets(fontanaLike);
     const labels = facets.flatMap(f => f.buckets.map(b => b.label));
     expect(labels).toContain('Hispanic');
-    expect(labels).toContain('Non-Hispanic');
+    expect(labels).toContain('General Market');
     // It should also discover the Owners / Intenders lifecycle split.
     expect(labels).toContain('Owners');
     expect(labels).toContain('Intenders');
@@ -81,9 +83,9 @@ describe('discoverCompositionFacets', () => {
   it('adapts to a different file (vehicle interest + ethnicity)', () => {
     const segs = segmentTotals([
       { zip: '1', audience_type: 'Hispanic EV Shoppers', audience_count: 300 },
-      { zip: '1', audience_type: 'Non-Hispanic EV Shoppers', audience_count: 200 },
+      { zip: '1', audience_type: 'General Market EV Shoppers', audience_count: 200 },
       { zip: '1', audience_type: 'Hispanic Luxury Owners', audience_count: 150 },
-      { zip: '1', audience_type: 'Non-Hispanic Luxury Owners', audience_count: 150 },
+      { zip: '1', audience_type: 'General Market Luxury Owners', audience_count: 150 },
     ]);
     const facets = discoverCompositionFacets(segs);
     // Should find two clean splits: EV/Shoppers vs Luxury/Owners, and ethnicity.

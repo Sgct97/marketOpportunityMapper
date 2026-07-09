@@ -1,4 +1,6 @@
 import type { DashboardModel } from '@/lib/audience/dashboard';
+import { TOP_SEGMENT_DISPLAY_COUNT, TOP_ZIP_DISPLAY_COUNT } from '@/lib/audience/presentation-limits';
+import type { ReachScopeCopy } from '@/lib/audience/presentation-scope';
 import { formatZipDisplay, formatZipDisplayTitle } from '@/lib/map/zip-labels';
 import type { ZipLabel } from '@/lib/map/zip-labels';
 import { formatCompact, formatNumber, formatPercent, EMPTY_VALUE } from '@/lib/format';
@@ -23,6 +25,9 @@ interface Props {
   datasetLabel: string | null;
   focusName: string | null;
   radiusMiles: number;
+  reachScope: ReachScopeCopy;
+  competitorsInScope: boolean;
+  excludedZipCount: number;
 }
 
 export function DashboardView({
@@ -33,6 +38,9 @@ export function DashboardView({
   datasetLabel,
   focusName,
   radiusMiles,
+  reachScope,
+  competitorsInScope,
+  excludedZipCount,
 }: Props) {
   const {
     totalAudience,
@@ -55,14 +63,17 @@ export function DashboardView({
   const subjectName = focusName || brandName;
   const compositionFacets = composition.slice(0, 2);
   const hasComposition = compositionFacets.length > 0;
+  const noSegmentsSelected = reachScope.segmentPhrase === 'No segments selected';
 
-  // Hero leads with TOTAL REACH (all segments, overlapping) so the headline
-  // matches the full market picture. The largest single segment — a defensible
-  // non-overlapping headcount — sits directly underneath as the supporting story.
+  // Hero leads with total reach for the active presentation scope (map filters).
   const heroReach = useTradeArea ? tradeArea!.audienceInRadius : totalAudience;
   const heroZips = useTradeArea ? tradeArea!.zipsInRadius : totalZips;
   const leadSegment = (useTradeArea ? tradeArea!.leadSegment : null) ?? topSegment;
-  const activeSegments = useTradeArea ? tradeArea!.segments : segments;
+  const activeSegments = (useTradeArea ? tradeArea!.segments : segments).slice(
+    0,
+    TOP_SEGMENT_DISPLAY_COUNT
+  );
+  const totalSegmentCount = useTradeArea ? tradeArea!.segments.length : segmentCount;
   const activeAudience = heroReach;
   const maxSegmentTotal = activeSegments[0]?.total ?? 1;
   const conc = useTradeArea
@@ -72,6 +83,15 @@ export function DashboardView({
   return (
     <div className="mom-scroll flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-[1340px] px-6 sm:px-8 lg:px-10 py-7 sm:py-9">
+        {noSegmentsSelected ? (
+          <section className="mom-card mom-card-lg p-8 text-center">
+            <p className="text-[15px] font-semibold text-[var(--ink)]">No segments selected</p>
+            <p className="mt-2 text-[13px] text-[var(--muted)]">
+              Choose at least one audience segment in the map controls to populate the dashboard.
+            </p>
+          </section>
+        ) : (
+        <>
         {/* Hero */}
         <section className="mom-card mom-card-lg mom-fade-up relative overflow-hidden p-7 sm:p-9">
           <div
@@ -91,11 +111,12 @@ export function DashboardView({
                 </span>
               </div>
               <p className="mt-2 text-[15px] sm:text-[16px] font-semibold leading-snug text-[var(--ink)]">
-                Total reach (all segments)
+                {reachScope.headline}
               </p>
               <p className="mt-1 text-[13px] text-[var(--faint)]">
-                {(useTradeArea ? activeSegments.length : segmentCount)} segments · {formatNumber(heroZips)} ZIPs · overlapping
+                {reachScope.segmentPhrase} · {formatNumber(heroZips)} ZIPs · overlapping
                 {useTradeArea ? ` · within ${radiusMiles} mi of ${subjectName}` : ' · across the market'}
+                {excludedZipCount > 0 ? ` · ${formatNumber(excludedZipCount)} ZIP${excludedZipCount === 1 ? '' : 's'} excluded` : ''}
               </p>
 
               {leadSegment && (
@@ -219,8 +240,8 @@ export function DashboardView({
             <SectionCard
               eyebrow={
                 useTradeArea
-                  ? `Trade area · ${activeSegments.length} segments`
-                  : `Full dataset · ${segmentCount} segments`
+                  ? `Trade area · top ${TOP_SEGMENT_DISPLAY_COUNT} of ${totalSegmentCount} segments`
+                  : `Current scope · top ${TOP_SEGMENT_DISPLAY_COUNT} of ${totalSegmentCount} segments`
               }
               title="Audience segment breakdown"
               right={
@@ -243,6 +264,9 @@ export function DashboardView({
                     ratio={seg.total / maxSegmentTotal}
                   />
                 ))}
+                {activeSegments.length === 0 && (
+                  <p className="py-3 text-[13px] text-[var(--muted)]">No segments in the current scope.</p>
+                )}
               </div>
             </SectionCard>
           </div>
@@ -251,8 +275,12 @@ export function DashboardView({
           <div className="lg:col-span-5 space-y-4 sm:space-y-5">
             <SectionCard
               eyebrow={topZipsScopeLabel}
-              title="Top ZIP codes"
-              right={<p className="text-[12px] text-[var(--muted)]">{formatNumber(topZips.length)} shown</p>}
+              title={`Top ${TOP_ZIP_DISPLAY_COUNT} ZIP codes`}
+              right={
+                <p className="text-[12px] text-[var(--muted)]">
+                  {formatNumber(Math.min(topZips.length, TOP_ZIP_DISPLAY_COUNT))} shown
+                </p>
+              }
             >
               <div className="space-y-1">
                 {topZips.map((z, i) => (
@@ -335,8 +363,9 @@ export function DashboardView({
                 </div>
               ) : (
                 <p className="text-[13px] leading-relaxed text-[var(--muted)]">
-                  No competitors saved yet. Add rival dealerships in setup to reveal white-space ZIPs
-                  and competitive coverage.
+                  {competitorsInScope
+                    ? 'No competitors saved yet. Add rival dealerships in setup to reveal white-space ZIPs and competitive coverage.'
+                    : 'Turn on the competitor layer in map controls to factor rivals into white-space analysis.'}
                 </p>
               )}
             </SectionCard>
@@ -346,13 +375,17 @@ export function DashboardView({
         {/* Methodology */}
         <p className="mt-7 text-[11px] leading-relaxed text-[var(--faint)] max-w-3xl">
           {datasetLabel ? `Source: ${datasetLabel}. ` : ''}
-          {useTradeArea
-            ? `Trade-area figures include only ZIPs within ${radiusMiles} mi of ${subjectName}. `
-            : ''}
+          Figures match the current map scope: {reachScope.segmentPhrase.toLowerCase()}
+          {excludedZipCount > 0 ? `, ${excludedZipCount} excluded ZIP${excludedZipCount === 1 ? '' : 's'}` : ''}
+          {useTradeArea ? `, within ${radiusMiles} mi of ${subjectName}` : ''}
+          {!competitorsInScope && competitive.competitorCount > 0 ? ', competitors hidden on map' : ''}.
+          {' '}
           “Reach” is the sum of segment counts; the same person can belong to more than one
           segment, so reach reflects total addressable touchpoints, not unique individuals.
           Distance uses straight-line miles from the client pin to ZIP centroids (not drive-time).
         </p>
+        </>
+        )}
       </div>
     </div>
   );

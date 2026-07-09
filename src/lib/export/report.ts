@@ -2,6 +2,11 @@ import { jsPDF } from 'jspdf';
 import type { AgencyBrandConfig } from '@/lib/agency-brand';
 import type { BrandConfig } from '@/lib/brands';
 import type { DashboardModel, SegmentTotal, TopZip } from '@/lib/audience/dashboard';
+import {
+  TOP_SEGMENT_DISPLAY_COUNT,
+  TOP_ZIP_DISPLAY_COUNT,
+} from '@/lib/audience/presentation-limits';
+import type { ReachScopeCopy } from '@/lib/audience/presentation-scope';
 import type { MapImage } from '@/lib/map/export-capture';
 import { formatZipDisplay } from '@/lib/map/zip-labels';
 import type { ZipLabel } from '@/lib/map/zip-labels';
@@ -24,6 +29,10 @@ export interface ReportInput {
   /** Captured map snapshot, or null if the map was unavailable. */
   mapImage: MapImage | null;
   zipLabels?: Record<string, ZipLabel>;
+  /** Mirrors the map segment scope for hero copy. */
+  reachScope?: ReachScopeCopy;
+  competitorsInScope?: boolean;
+  excludedZipCount?: number;
   generatedAt?: Date;
 }
 
@@ -83,8 +92,15 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     model,
     mapImage,
     zipLabels = {},
+    reachScope,
+    competitorsInScope = true,
+    excludedZipCount = 0,
   } = input;
   const generatedAt = input.generatedAt ?? new Date();
+  const scopeCopy = reachScope ?? {
+    headline: 'Total reach (all segments)',
+    segmentPhrase: `${model.segmentCount} segments`,
+  };
   // The body accent follows the active palette chosen in the presentation (the
   // caller passes either the vehicle/OEM brand or the agency brand here), while
   // the agency stripe/letterhead always uses the agency primary.
@@ -344,14 +360,14 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12.5);
   setText(INK);
-  doc.text('Total reach (all segments)', MARGIN, y);
+  doc.text(scopeCopy.headline, MARGIN, y);
   y += 6;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   setText(FAINT);
-  const reachMeta = `${activeSegments.length} segments · ${formatNumber(heroZips)} ZIPs · overlapping${
+  const reachMeta = `${scopeCopy.segmentPhrase} · ${formatNumber(heroZips)} ZIPs · overlapping${
     useTradeArea ? ` · within ${radiusMiles} mi of ${subjectName}` : ' · across the market'
-  }`;
+  }${excludedZipCount > 0 ? ` · ${formatNumber(excludedZipCount)} ZIP${excludedZipCount === 1 ? '' : 's'} excluded` : ''}`;
   doc.text(reachMeta, MARGIN, y);
   y += 8;
 
@@ -530,14 +546,18 @@ export function buildMarketReport(input: ReportInput): jsPDF {
 
   // ── nested table renderers (use the bound helpers above) ───────────────
   function drawSegmentTable(x: number, top: number, w: number, segments: SegmentTotal[], total: number) {
-    eyebrow(`Audience segment breakdown · ${segments.length} segments`, x, top);
+    eyebrow(
+      `Audience segment breakdown · top ${TOP_SEGMENT_DISPLAY_COUNT} of ${segments.length} segments`,
+      x,
+      top
+    );
     let ty = top + 6;
     doc.setFontSize(7.5);
     setText(FAINT);
     doc.text(`Total audience ${formatNumber(total)}`, x, ty);
     ty += 5;
     const max = segments[0]?.total ?? 1;
-    const rows = segments.slice(0, 16);
+    const rows = segments.slice(0, TOP_SEGMENT_DISPLAY_COUNT);
     rows.forEach((seg, i) => {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
@@ -563,7 +583,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   }
 
   function drawTopZips(x: number, top: number, w: number, zips: TopZip[], scope: string) {
-    eyebrow(`Top ZIP codes · ${scope}`, x, top);
+    eyebrow(`Top ${TOP_ZIP_DISPLAY_COUNT} ZIP codes · ${scope}`, x, top);
     let ty = top + 8;
     if (zips.length === 0) {
       doc.setFont('helvetica', 'normal');
@@ -573,7 +593,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
       return;
     }
     const max = zips[0]?.count ?? 1;
-    zips.slice(0, 8).forEach((z, i) => {
+    zips.slice(0, TOP_ZIP_DISPLAY_COUNT).forEach((z, i) => {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.5);
       setText(i === 0 ? accent : FAINT);
