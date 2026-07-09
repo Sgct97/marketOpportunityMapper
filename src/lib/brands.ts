@@ -1,4 +1,5 @@
 import type { AgencyBrandConfig } from '@/lib/agency-brand';
+import type { MapTheme } from '@/lib/map/basemap';
 import { detectBrand } from '@/lib/dealership/infer-client';
 
 /**
@@ -209,6 +210,115 @@ function shade(hex: string, amount: number): string {
 function rgba(hex: string, alpha: number): string {
   const [r, g, b] = toRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/** Pick black/white text for contrast against a background color. */
+export function readableOnBackground(hex: string): string {
+  return readableOn(hex);
+}
+
+function normalizeBrandToken(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i]![0] = i;
+  for (let j = 0; j <= n; j++) dp[0]![j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i]![j] = Math.min(dp[i - 1]![j]! + 1, dp[i]![j - 1]! + 1, dp[i - 1]![j - 1]! + cost);
+    }
+  }
+  return dp[m]![n]!;
+}
+
+function fuzzyMatchOem(token: string): string | null {
+  if (token.length < 3) return null;
+  let best: string | null = null;
+  let bestDistance = 2;
+  for (const oem of Object.keys(OEM_ACCENTS)) {
+    const distance = levenshtein(token, normalizeBrandToken(oem));
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = oem;
+    }
+  }
+  return bestDistance <= 1 ? best : null;
+}
+
+/**
+ * Resolve a loose brand label (or dealership name hint) to a canonical OEM name.
+ * Handles substring matches, exact labels, and one-character typos like "Nisan".
+ */
+export function canonicalizeOemBrand(brandName: string, hintText?: string): string | null {
+  for (const text of [brandName, hintText ?? '']) {
+    const trimmed = text.trim();
+    if (!trimmed) continue;
+
+    const detected = detectBrand(trimmed);
+    if (detected) return detected;
+
+    const exact = Object.keys(OEM_ACCENTS).find(
+      key => key.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (exact) return exact;
+
+    const fuzzy = fuzzyMatchOem(normalizeBrandToken(trimmed));
+    if (fuzzy) return fuzzy;
+  }
+
+  return null;
+}
+
+/** Resolve a dealership brand string to a curated OEM accent, if known. */
+export function resolveOemBrandConfig(brandName: string, hintText?: string): BrandConfig | null {
+  const canonical = canonicalizeOemBrand(brandName, hintText);
+  if (!canonical || !OEM_ACCENTS[canonical]) return null;
+  return buildBrand(slugify(canonical), canonical, OEM_ACCENTS[canonical]!);
+}
+
+/** Vivid pin colors for unknown brands — still distinct per name. */
+const COMPETITOR_FALLBACK_PIN_PALETTE = [
+  '#FF6A5C',
+  '#7FC65C',
+  '#5C9BFF',
+  '#D8B477',
+  '#FF4D6E',
+  '#79E0C8',
+  '#C48F8F',
+  '#B08CC4',
+];
+
+function hashBrandName(brand: string): number {
+  let hash = 0;
+  for (let i = 0; i < brand.length; i++) {
+    hash = (hash * 31 + brand.toLowerCase().charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+/** Pin fill for a competitor — OEM glow on dark maps, true brand hue on light. */
+export function competitorPinColor(
+  brandName: string,
+  theme: MapTheme = 'dark',
+  hintText?: string
+): string {
+  const config = resolveOemBrandConfig(brandName, hintText);
+  if (config) {
+    return theme === 'light' ? config.primaryColor : config.glow;
+  }
+  return COMPETITOR_FALLBACK_PIN_PALETTE[
+    hashBrandName(brandName || hintText || 'unknown') % COMPETITOR_FALLBACK_PIN_PALETTE.length
+  ]!;
+}
+
+/** Number label color that contrasts with the pin fill. */
+export function competitorPinLabelColor(pinColor: string): string {
+  return readableOn(pinColor);
 }
 
 /** Pick black/white text for contrast against a background color. */

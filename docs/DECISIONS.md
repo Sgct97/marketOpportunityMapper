@@ -41,7 +41,7 @@ The client confirmed pitches use **audience files only** plus **dealer website**
 - ZIP map (MapLibre, segment filters, tooltips)
 - **Client dealer:** website lookup + confirm UI
 - **Competitors:** Places search + review checklist + save to map
-- Dealership layer: client vs competitor pins, brand filter, focus client, radius 10/25/50 mi
+- Dealership layer: client vs competitor pins, brand filter, focus client, radius 10/15/20/25 mi
 - Competitive summaries (audience in radius, top ZIPs, white-space)
 - Layer toggles; settings persist on project
 - Supabase Auth before client-facing deploy

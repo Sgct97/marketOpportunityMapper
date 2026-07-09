@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultBrand, getBrand, resolveBrandAccent } from './brands';
+import { competitorPinColor, defaultBrand, getBrand, resolveBrandAccent } from './brands';
 
 describe('resolveBrandAccent', () => {
   it('prefers the confirmed client brand', () => {
@@ -56,6 +56,31 @@ describe('resolveBrandAccent', () => {
       return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
     };
     expect(lum(brand.glow)).toBeGreaterThan(lum(brand.primaryColor));
+  });
+});
+
+describe('competitorPinColor', () => {
+  it('returns distinct OEM colors for different brands', () => {
+    const toyota = competitorPinColor('Toyota', 'dark');
+    const honda = competitorPinColor('Honda', 'dark');
+    expect(toyota).not.toBe(honda);
+    expect(toyota).toMatch(/^#[0-9a-f]{6}$/i);
+  });
+
+  it('uses stable fallback colors for unknown brands', () => {
+    const a = competitorPinColor('Independent Motors', 'dark');
+    const b = competitorPinColor('Independent Motors', 'dark');
+    const c = competitorPinColor('Other Lot', 'dark');
+    expect(a).toBe(b);
+    expect(a).not.toBe(c);
+  });
+
+  it('corrects common OEM typos like Nisan', () => {
+    expect(competitorPinColor('Nisan', 'dark')).toBe('#FF445F');
+  });
+
+  it('infers OEM color from the dealership name when brand is missing', () => {
+    expect(competitorPinColor('', 'dark', 'Fontana Nissan')).toBe('#FF445F');
   });
 });
 

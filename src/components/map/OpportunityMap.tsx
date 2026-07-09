@@ -5,15 +5,22 @@ import maplibregl from 'maplibre-gl';
 import type { FeatureCollection, Geometry } from 'geojson';
 import { aggregateAudienceByZip } from '@/lib/audience/aggregate';
 import type { AudienceZipRow } from '@/lib/audience/aggregate';
+import { segmentMetricsForZip } from '@/lib/audience/zip-exclude';
+import { zipsWithinRadius } from '@/lib/audience/market-analysis';
+import type { ZipLabel } from '@/lib/map/zip-labels';
+import type { LatLng } from '@/lib/map/centroids';
 import type { DealershipRow } from '@/lib/dealership/types';
+import { rankedCompetitorsForProject } from '@/lib/dealership/rank-competitors';
 import type { RadiusMiles } from '@/lib/projects/settings';
 import { resolveBasemapStyles, type MapTheme } from '@/lib/map/basemap';
 import { choroplethFillPaint, choroplethLinePaint } from '@/lib/map/choropleth';
 import { hexToRgb } from '@/lib/map/colors';
 import { fetchZipBoundaries } from '@/lib/map/boundaries';
 import {
+  CLIENT_DEALERSHIP_HALO_LAYER,
   CLIENT_DEALERSHIP_LAYER,
   COMPETITOR_DEALERSHIP_LAYER,
+  COMPETITOR_DEALERSHIP_LABEL_LAYER,
   DEALERSHIP_PIN_LAYERS,
   ensureDealershipLayers,
   setLayerVisibility,
@@ -22,6 +29,7 @@ import {
 import { dealershipPopupHtml } from '@/lib/map/dealership-popup';
 import { mergeAudienceIntoBoundaries } from '@/lib/map/geojson';
 import { audiencePopupHtml } from '@/lib/map/popup';
+import { CompetitorLegend } from '@/components/map/CompetitorLegend';
 
 interface Props {
   rows: AudienceZipRow[];
@@ -35,6 +43,10 @@ interface Props {
   showClientDealershipLayer: boolean;
   showCompetitorLayer: boolean;
   showRadiusLayer: boolean;
+  excludedZips?: string[];
+  zipCentroids?: Record<string, LatLng>;
+  zipLabels?: Record<string, ZipLabel>;
+  onToggleZipExcluded?: (zip: string) => void;
   onFocusDealership: (id: string) => void;
   /** When false the map is hidden (e.g. dashboard view); resize on re-show. */
   active?: boolean;
@@ -114,7 +126,7 @@ function ensureZipLayers(
         id: 'zip-fill',
         type: 'fill',
         source: 'zip-areas',
-        paint: choroplethFillPaint(rgb, maxCount),
+        paint: choroplethFillPaint(rgb, maxCount, theme),
       },
       beforeId
     );
@@ -140,7 +152,7 @@ function applyChoroplethPaint(
   theme: MapTheme
 ) {
   if (map.getLayer('zip-fill')) {
-    const fill = choroplethFillPaint(rgb, maxCount);
+    const fill = choroplethFillPaint(rgb, maxCount, theme);
     if (fill) {
       if ('fill-color' in fill && fill['fill-color'] != null) {
         map.setPaintProperty('zip-fill', 'fill-color', fill['fill-color']);
@@ -193,6 +205,10 @@ export function OpportunityMap({
   showClientDealershipLayer,
   showCompetitorLayer,
   showRadiusLayer,
+  excludedZips = [],
+  zipCentroids = {},
+  zipLabels = {},
+  onToggleZipExcluded,
   onFocusDealership,
   active = true,
   theme = 'dark',
@@ -202,27 +218,46 @@ export function OpportunityMap({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const hoverBoundRef = useRef(false);
+  const clickBoundRef = useRef(false);
   const dealerBoundRef = useRef(false);
   const hoveredFeatureIdRef = useRef<string | number | null>(null);
   const onFocusRef = useRef(onFocusDealership);
   const focusIdRef = useRef(focusDealershipId);
   const onMapReadyRef = useRef(onMapReady);
 
+  const onToggleZipExcludedRef = useRef(onToggleZipExcluded);
+  const excludedZipsRef = useRef(excludedZips);
+  const zipLabelsRef = useRef(zipLabels);
+  const rowsRef = useRef(rows);
+
+  const themeRef = useRef(theme);
+
   useEffect(() => {
     onFocusRef.current = onFocusDealership;
     focusIdRef.current = focusDealershipId;
     onMapReadyRef.current = onMapReady;
-  }, [onFocusDealership, focusDealershipId, onMapReady]);
+    onToggleZipExcludedRef.current = onToggleZipExcluded;
+    excludedZipsRef.current = excludedZips;
+    zipLabelsRef.current = zipLabels;
+    rowsRef.current = rows;
+    themeRef.current = theme;
+  }, [onFocusDealership, focusDealershipId, onMapReady, onToggleZipExcluded, excludedZips, zipLabels, rows, theme]);
 
   const [layersReady, setLayersReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [boundaryLoading, setBoundaryLoading] = useState(false);
   const [boundaryError, setBoundaryError] = useState<string | null>(null);
   const [featureCount, setFeatureCount] = useState(0);
+  const boundaryDataRef = useRef<FeatureCollection<Geometry> | null>(null);
 
   const aggregate = useMemo(
     () => aggregateAudienceByZip(rows, selectedTypes),
     [rows, selectedTypes]
+  );
+
+  const rankedCompetitors = useMemo(
+    () => rankedCompetitorsForProject(dealerships, focusDealershipId),
+    [dealerships, focusDealershipId]
   );
 
   const zipsForBoundaries = useMemo(
@@ -231,12 +266,100 @@ export function OpportunityMap({
     [aggregate]
   );
 
+  const tradeAreaZipSet = useMemo((): ReadonlySet<string> | null => {
+    const focus = dealerships.find(d => d.id === focusDealershipId);
+    if (focus?.latitude == null || focus?.longitude == null) return null;
+
+    const { inRadius, centroidsResolved } = zipsWithinRadius({
+      byZip: aggregate.byZip,
+      zipCentroids,
+      focusLat: focus.latitude,
+      focusLng: focus.longitude,
+      radiusMiles,
+    });
+
+    // Wait until centroids load before hiding out-of-radius ZIPs.
+    if (centroidsResolved === 0) return null;
+
+    return new Set(Object.keys(inRadius));
+  }, [dealerships, focusDealershipId, zipCentroids, aggregate.byZip, radiusMiles]);
+
+  const activeMaxCount = useMemo(() => {
+    const excluded = new Set(excludedZips);
+    let max = 0;
+    for (const [zip, count] of Object.entries(aggregate.byZip)) {
+      if (excluded.has(zip)) continue;
+      if (tradeAreaZipSet && !tradeAreaZipSet.has(zip)) continue;
+      if (count > max) max = count;
+    }
+    return max || 1;
+  }, [aggregate.byZip, excludedZips, tradeAreaZipSet]);
+
   const isEmptySelection =
     selectedTypes.length === 0 || zipsForBoundaries.length === 0;
   const displayedFeatureCount = isEmptySelection ? 0 : featureCount;
 
   const rgb = useMemo(() => hexToRgb(primaryColor), [primaryColor]);
   const mapStyles = useMemo(() => resolveBasemapStyles(theme), [theme]);
+
+  const zipLayerStyleRef = useRef({
+    activeMaxCount,
+    rgb,
+    theme,
+    byZip: aggregate.byZip,
+    typeLabel,
+    excludedZips,
+    tradeAreaZipSet: null as ReadonlySet<string> | null,
+  });
+
+  useEffect(() => {
+    zipLayerStyleRef.current = {
+      activeMaxCount,
+      rgb,
+      theme,
+      byZip: aggregate.byZip,
+      typeLabel,
+      excludedZips,
+      tradeAreaZipSet,
+    };
+  }, [activeMaxCount, rgb, theme, aggregate.byZip, typeLabel, excludedZips, tradeAreaZipSet]);
+
+  const applyZipLayerData = useCallback((map: maplibregl.Map, rawBoundaries: FeatureCollection<Geometry>) => {
+    const {
+      activeMaxCount: max,
+      rgb: layerRgb,
+      theme: layerTheme,
+      byZip,
+      typeLabel: label,
+      excludedZips: excluded,
+      tradeAreaZipSet: scopeZips,
+    } = zipLayerStyleRef.current;
+
+    ensureZipLayers(map, layerRgb, max, layerTheme);
+    applyChoroplethPaint(map, layerRgb, max, layerTheme);
+
+    const merged = mergeAudienceIntoBoundaries(
+      rawBoundaries as FeatureCollection<Geometry, { ZCTA5?: string }>,
+      byZip,
+      label,
+      excluded,
+      scopeZips
+    );
+
+    const source = map.getSource('zip-areas') as maplibregl.GeoJSONSource | undefined;
+    source?.setData(merged);
+    setFeatureCount(merged.features.length);
+
+    if (merged.features.length === 0) {
+      setBoundaryError(
+        'No ZIP boundaries returned for this dataset. Census may be missing those ZIP codes.'
+      );
+      return merged;
+    }
+
+    setBoundaryError(null);
+    return merged;
+  }, []);
 
   const clearHoverState = useCallback((map: maplibregl.Map) => {
     const id = hoveredFeatureIdRef.current;
@@ -255,8 +378,11 @@ export function OpportunityMap({
         if (!e.features?.[0]) return;
         const feature = e.features[0];
         const props = feature.properties || {};
-        const zip = props.ZCTA5 || props.GEOID || props.BASENAME || '';
+        const zip = String(props.ZCTA5 || props.GEOID || props.BASENAME || '');
         const count = Number(props.audienceCount ?? 0);
+        const excluded = Boolean(props.excluded);
+        const segments = segmentMetricsForZip(rowsRef.current, zip);
+        const totalCount = segments.reduce((sum, seg) => sum + seg.count, 0);
         const featureId = feature.id;
 
         if (featureId != null && hoveredFeatureIdRef.current !== featureId) {
@@ -270,10 +396,14 @@ export function OpportunityMap({
           ?.setLngLat(e.lngLat)
           .setHTML(
             audiencePopupHtml({
-              zip: String(zip),
+              zip,
               typeLabel: String(props.audienceTypeLabel || typeLabel),
-              count,
+              count: totalCount > 0 ? totalCount : count,
               accentColor: primaryColor,
+              segments,
+              excluded,
+              theme: themeRef.current,
+              zipLabels: zipLabelsRef.current,
             })
           )
           .addTo(map);
@@ -287,6 +417,21 @@ export function OpportunityMap({
     },
     [typeLabel, primaryColor, clearHoverState]
   );
+
+  const bindZipClickHandler = useCallback((map: maplibregl.Map) => {
+    if (clickBoundRef.current) return;
+    clickBoundRef.current = true;
+
+    map.on('click', 'zip-fill', e => {
+      const feature = e.features?.[0];
+      if (!feature?.properties) return;
+      const zip = String(
+        feature.properties.ZCTA5 || feature.properties.GEOID || feature.properties.BASENAME || ''
+      );
+      if (!zip || !onToggleZipExcludedRef.current) return;
+      onToggleZipExcludedRef.current(zip);
+    });
+  }, []);
 
   const bindDealershipHandlers = useCallback((map: maplibregl.Map) => {
     if (dealerBoundRef.current) return;
@@ -315,6 +460,11 @@ export function OpportunityMap({
       const feature = e.features?.[0];
       if (!feature?.properties) return;
       const props = feature.properties;
+      const rankRaw = props.rank;
+      const rank =
+        rankRaw != null && rankRaw !== '' && !Number.isNaN(Number(rankRaw))
+          ? Number(rankRaw)
+          : undefined;
       popupRef.current
         ?.setLngLat(e.lngLat)
         .setHTML(
@@ -324,6 +474,7 @@ export function OpportunityMap({
             role: props.role === 'client' ? 'client' : 'competitor',
             accentColor: primaryColor,
             isFocus: String(props.id) === focusIdRef.current,
+            rank,
           })
         )
         .addTo(map);
@@ -340,9 +491,10 @@ export function OpportunityMap({
     const initLayers = (map: maplibregl.Map) => {
       if (cancelled) return;
       tuneBasemapLegibility(map, theme);
-      ensureZipLayers(map, rgb, aggregate.maxCount || 1, theme);
+      ensureZipLayers(map, rgb, 1, theme);
       ensureDealershipLayers(map, primaryColor);
       bindHoverHandlers(map);
+      bindZipClickHandler(map);
       bindDealershipHandlers(map);
       setLayersReady(true);
       setMapError(null);
@@ -371,7 +523,7 @@ export function OpportunityMap({
         closeOnClick: false,
         className: 'mom-popup',
         offset: 12,
-        maxWidth: '240px',
+        maxWidth: '420px',
       });
 
       const onStyleReady = () => initLayers(map);
@@ -403,6 +555,7 @@ export function OpportunityMap({
     return () => {
       cancelled = true;
       hoverBoundRef.current = false;
+      clickBoundRef.current = false;
       dealerBoundRef.current = false;
       hoveredFeatureIdRef.current = null;
       onMapReadyRef.current?.(null);
@@ -412,16 +565,21 @@ export function OpportunityMap({
       mapRef.current = null;
       setLayersReady(false);
       setFeatureCount(0);
+      boundaryDataRef.current = null;
     };
-  }, [rgb, bindHoverHandlers, bindDealershipHandlers, aggregate.maxCount, primaryColor, mapStyles, theme]);
+  }, [rgb, bindHoverHandlers, bindZipClickHandler, bindDealershipHandlers, primaryColor, mapStyles, theme]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !layersReady) return;
 
     setLayerVisibility(map, ['zip-fill', 'zip-outline'], showZipLayer);
-    setLayerVisibility(map, [CLIENT_DEALERSHIP_LAYER], showClientDealershipLayer);
-    setLayerVisibility(map, [COMPETITOR_DEALERSHIP_LAYER], showCompetitorLayer);
+    setLayerVisibility(map, [CLIENT_DEALERSHIP_LAYER, CLIENT_DEALERSHIP_HALO_LAYER], showClientDealershipLayer);
+    setLayerVisibility(
+      map,
+      [COMPETITOR_DEALERSHIP_LAYER, COMPETITOR_DEALERSHIP_LABEL_LAYER],
+      showCompetitorLayer
+    );
     setLayerVisibility(map, ['radius-fill', 'radius-glow', 'radius-outline'], showRadiusLayer);
 
     updateDealershipSources(map, {
@@ -429,6 +587,7 @@ export function OpportunityMap({
       focusDealershipId,
       radiusMiles,
       showRadius: showRadiusLayer,
+      theme,
     });
   }, [
     layersReady,
@@ -439,6 +598,7 @@ export function OpportunityMap({
     showClientDealershipLayer,
     showCompetitorLayer,
     showRadiusLayer,
+    theme,
   ]);
 
   useEffect(() => {
@@ -468,8 +628,10 @@ export function OpportunityMap({
     if (!map || !layersReady) return;
 
     if (isEmptySelection) {
+      boundaryDataRef.current = null;
       const source = map.getSource('zip-areas') as maplibregl.GeoJSONSource | undefined;
       source?.setData({ type: 'FeatureCollection', features: [] });
+      setFeatureCount(0);
       return;
     }
 
@@ -487,30 +649,10 @@ export function OpportunityMap({
         const mapInstance = mapRef.current;
         if (!mapInstance || controller.signal.aborted) return;
 
-        const max = aggregate.maxCount || 1;
-        ensureZipLayers(mapInstance, rgb, max, theme);
-        applyChoroplethPaint(mapInstance, rgb, max, theme);
+        boundaryDataRef.current = data;
+        const merged = applyZipLayerData(mapInstance, data);
 
-        const merged = mergeAudienceIntoBoundaries(
-          data as FeatureCollection<Geometry, { ZCTA5?: string }>,
-          aggregate.byZip,
-          typeLabel
-        );
-
-        const source = mapInstance.getSource('zip-areas') as maplibregl.GeoJSONSource | undefined;
-        source?.setData(merged);
-        setFeatureCount(merged.features.length);
-
-        if (merged.features.length === 0) {
-          setBoundaryError(
-            'No ZIP boundaries returned for this dataset. Census may be missing those ZIP codes.'
-          );
-          return;
-        }
-
-        setBoundaryError(null);
-
-        if (!focusDealershipId) {
+        if (!focusDealershipId && merged.features.length > 0) {
           const bounds = new maplibregl.LngLatBounds();
           for (const feature of merged.features) {
             extendBoundsFromFeature(bounds, feature);
@@ -534,15 +676,23 @@ export function OpportunityMap({
       loading = false;
       controller.abort();
     };
+  }, [layersReady, isEmptySelection, zipsForBoundaries, focusDealershipId, applyZipLayerData]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const cached = boundaryDataRef.current;
+    if (!map || !layersReady || isEmptySelection || !cached) return;
+    applyZipLayerData(map, cached);
   }, [
     layersReady,
     isEmptySelection,
-    zipsForBoundaries,
+    applyZipLayerData,
+    activeMaxCount,
     aggregate.byZip,
-    aggregate.maxCount,
     typeLabel,
+    excludedZips,
+    tradeAreaZipSet,
     rgb,
-    focusDealershipId,
     theme,
   ]);
 
@@ -578,6 +728,16 @@ export function OpportunityMap({
         <div className="mom-alert absolute top-14 left-4 right-4 z-10 max-w-md px-4 py-2.5 text-xs">
           {boundaryError}
         </div>
+      )}
+
+      {layersReady && showCompetitorLayer && rankedCompetitors.length > 0 && (
+        <CompetitorLegend
+          competitors={rankedCompetitors}
+          theme={theme}
+          className={`absolute left-0 z-10 rounded-none rounded-br-[11px] border-t-0 border-l-0 ${
+            boundaryLoading ? 'top-9' : 'top-0'
+          }`}
+        />
       )}
 
       {layersReady && !boundaryLoading && displayedFeatureCount > 0 && (

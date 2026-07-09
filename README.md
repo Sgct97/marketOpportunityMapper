@@ -36,7 +36,7 @@ Open [http://localhost:3000](http://localhost:3000).
 - ZIP boundary heatmap (MapLibre + vector tiles)
 - Audience type filters and tooltips
 - Dealership pins (client vs competitor), brand filter, **focus dealership**
-- Radius rings (10 / 25 / 50 mi), competitive summaries, white-space (MVP-lite)
+- Radius rings (10 / 15 / 20 / 25 mi), competitive summaries, white-space (MVP-lite)
 - Layer toggles, branded PDF export
 - Supabase (auth, DB, storage) + Render hosting
 

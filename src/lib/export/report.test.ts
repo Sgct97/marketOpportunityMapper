@@ -71,6 +71,10 @@ const model: DashboardModel = {
       zips: 80,
       share: 0.2,
     },
+    segments: [
+      { name: 'Non-Hispanic Vehicle Owners – 6–15 Years Old', total: 27_200, zips: 80, share: 0.2 },
+      { name: 'Hispanic NISSAN Owners', total: 24_000, zips: 75, share: 0.176 },
+    ],
   },
   competitive: {
     competitorCount: 16,

@@ -1,7 +1,10 @@
 'use client';
 
+import { TOP_ZIP_DISPLAY_COUNT } from '@/lib/audience/presentation-limits';
 import { legendStops } from '@/lib/audience/aggregate';
 import type { MarketAnalysis } from '@/lib/audience/market-analysis';
+import { formatZipDisplay, formatZipDisplayTitle } from '@/lib/map/zip-labels';
+import type { ZipLabel } from '@/lib/map/zip-labels';
 import type { DealershipRow } from '@/lib/dealership/types';
 import type { AccentSource, RadiusMiles } from '@/lib/projects/settings';
 import { fillColor, hexToRgb } from '@/lib/map/colors';
@@ -15,6 +18,8 @@ interface Props {
   onClearAll: () => void;
   totalAudience: number;
   zipCount: number;
+  excludedZipCount: number;
+  onRestoreAllZips: () => void;
   maxCount: number;
   primaryColor: string;
   datasetLabel?: string | null;
@@ -39,6 +44,7 @@ interface Props {
   onToggleCompetitorLayer: (visible: boolean) => void;
   onToggleRadiusLayer: (visible: boolean) => void;
   marketAnalysis: MarketAnalysis | null;
+  zipLabels: Record<string, ZipLabel>;
   hasFocusDealership: boolean;
   onCollapse?: () => void;
 }
@@ -98,6 +104,8 @@ export function MapSidebar({
   onClearAll,
   totalAudience,
   zipCount,
+  excludedZipCount,
+  onRestoreAllZips,
   maxCount,
   primaryColor,
   datasetLabel,
@@ -122,6 +130,7 @@ export function MapSidebar({
   onToggleCompetitorLayer,
   onToggleRadiusLayer,
   marketAnalysis,
+  zipLabels,
   hasFocusDealership,
   onCollapse,
 }: Props) {
@@ -231,14 +240,14 @@ export function MapSidebar({
               </option>
             ))}
           </select>
-          <div className="flex gap-2 pt-0.5">
+          <div className="grid grid-cols-4 gap-1.5 pt-0.5">
             {radiusOptions.map(miles => (
               <button
                 key={miles}
                 type="button"
                 onClick={() => onRadiusChange(miles)}
                 data-active={radiusMiles === miles}
-                className="flex-1 rounded-lg border py-2 text-[13px] font-semibold transition-colors data-[active=true]:border-[var(--accent)] data-[active=true]:bg-[var(--accent-soft)] data-[active=true]:text-[var(--ink)] border-[var(--line)] text-[var(--muted)] hover:border-[var(--faint)]"
+                className="rounded-lg border py-2 text-[12px] font-semibold transition-colors data-[active=true]:border-[var(--accent)] data-[active=true]:bg-[var(--accent-soft)] data-[active=true]:text-[var(--ink)] border-[var(--line)] text-[var(--muted)] hover:border-[var(--faint)]"
               >
                 {miles} mi
               </button>
@@ -263,7 +272,7 @@ export function MapSidebar({
           </div>
         </div>
         <p className="text-[11px] text-[var(--faint)] -mt-1">
-          Filters the map. The dashboard always shows every segment.
+          Filters the map, dashboard, and export together.
         </p>
         <div className="mom-scroll max-h-44 overflow-y-auto space-y-0.5 pr-1">
           {audienceTypes.map(type => {
@@ -284,6 +293,33 @@ export function MapSidebar({
             );
           })}
         </div>
+      </div>
+
+      <div className="px-6 py-4 border-b border-[var(--line-soft)] space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[13px] font-semibold text-[var(--ink)]">ZIP curation</p>
+          {excludedZipCount > 0 && (
+            <button
+              type="button"
+              onClick={onRestoreAllZips}
+              className="text-[12px] font-medium text-[var(--accent)] hover:underline shrink-0"
+            >
+              Restore all
+            </button>
+          )}
+        </div>
+        <p className="text-[11px] text-[var(--faint)] leading-snug">
+          Click a ZIP on the map to include or exclude it from every metric, dashboard total, and
+          export.
+        </p>
+        {excludedZipCount > 0 && (
+          <p className="text-[12px] text-[var(--muted)]">
+            <span className="font-semibold text-[var(--ink)] tnum">
+              {formatNumber(excludedZipCount)}
+            </span>{' '}
+            ZIP{excludedZipCount === 1 ? '' : 's'} excluded
+          </p>
+        )}
       </div>
 
       <div className="px-6 py-4 border-b border-[var(--line-soft)]">
@@ -316,17 +352,22 @@ export function MapSidebar({
             </p>
           </div>
 
-          {marketAnalysis.topZips.length > 0 && (
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--faint)] mb-2">
-                Top ZIPs {scoped ? 'in trade area' : 'in market'}
-              </p>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--faint)] mb-2">
+              Top {TOP_ZIP_DISPLAY_COUNT} ZIP codes {scoped ? 'in trade area' : 'in market'}
+            </p>
+            {marketAnalysis.topZips.length > 0 ? (
               <ul className="space-y-1.5">
                 {marketAnalysis.topZips.map((z, i) => (
-                  <li key={z.zip} className="flex items-center justify-between text-[13px]">
-                    <span className="text-[var(--muted)] tnum">
-                      <span className="inline-block w-5 text-[var(--faint)]">{i + 1}</span>
-                      {z.zip}
+                  <li key={z.zip} className="flex items-center justify-between gap-3 text-[13px]">
+                    <span className="min-w-0 flex-1 text-[var(--muted)]">
+                      <span className="inline-block w-5 text-[var(--faint)] tnum">{i + 1}</span>
+                      <span
+                        className="font-medium text-[var(--ink-2)] truncate"
+                        title={formatZipDisplayTitle(z.zip, zipLabels)}
+                      >
+                        {formatZipDisplay(z.zip, zipLabels)}
+                      </span>
                     </span>
                     <span className="font-semibold text-[var(--ink)] tnum">
                       {formatNumber(z.count)}
@@ -334,8 +375,10 @@ export function MapSidebar({
                   </li>
                 ))}
               </ul>
-            </div>
-          )}
+            ) : (
+              <p className="text-[12px] text-[var(--muted)]">No ZIP data in the current scope.</p>
+            )}
+          </div>
 
           {marketAnalysis.whiteSpace.length > 0 && (
             <div className="rounded-xl border border-[var(--line)] px-4 py-3">
@@ -347,9 +390,13 @@ export function MapSidebar({
               </p>
               <ul className="space-y-1.5">
                 {marketAnalysis.whiteSpace.map(z => (
-                  <li key={z.zip} className="flex items-center justify-between text-[13px]">
-                    <span className="font-medium tnum" style={{ color: 'var(--accent)' }}>
-                      {z.zip}
+                  <li key={z.zip} className="flex items-center justify-between gap-3 text-[13px]">
+                    <span
+                      className="min-w-0 flex-1 truncate font-medium tnum"
+                      style={{ color: 'var(--accent)' }}
+                      title={formatZipDisplayTitle(z.zip, zipLabels)}
+                    >
+                      {formatZipDisplay(z.zip, zipLabels)}
                     </span>
                     <span className="font-semibold text-[var(--ink)] tnum">
                       {formatNumber(z.count)}
@@ -357,6 +404,18 @@ export function MapSidebar({
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {competitorCount > 0 && marketAnalysis.whiteSpace.length === 0 && (
+            <div className="rounded-xl border border-[var(--line)] px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--faint)]">
+                White space
+              </p>
+              <p className="text-[11px] text-[var(--muted)] mt-0.5">
+                No high-audience ZIPs without a rival within {radiusMiles} mi. Competitors cover
+                the top opportunities in this trade area.
+              </p>
             </div>
           )}
 
@@ -393,14 +452,19 @@ export function MapSidebar({
         <div className="mt-4 flex gap-4 text-[11px] text-[var(--muted)]">
           <span className="flex items-center gap-1.5">
             <span
-              className="w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm"
-              style={{ backgroundColor: 'var(--accent)' }}
-            />
-            Client
+              className="text-[13px] leading-none drop-shadow-sm"
+              style={{ color: 'var(--accent)' }}
+              aria-hidden
+            >
+              ★
+            </span>
+            Client (home)
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#9FB1C9] border border-[rgba(7,11,21,0.9)] shadow-sm" />
-            Competitor
+            <span className="flex h-2.5 w-2.5 items-center justify-center rounded-full bg-[#9FB1C9] border border-[rgba(7,11,21,0.9)] text-[7px] font-bold text-white shadow-sm">
+              #
+            </span>
+            Competitor (numbered, colored by brand)
           </span>
         </div>
       </div>

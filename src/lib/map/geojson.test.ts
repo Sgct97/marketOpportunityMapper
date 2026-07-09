@@ -77,4 +77,12 @@ describe('mergeAudienceIntoBoundaries', () => {
     const merged = mergeAudienceIntoBoundaries(boundaries, {}, 'Test');
     expect(merged.features).toHaveLength(0);
   });
+
+  it('limits features to an optional trade-area ZIP set', () => {
+    const byZip = { '90210': 1200, '75067': 500 };
+    const scoped = new Set(['90210']);
+    const merged = mergeAudienceIntoBoundaries(boundaries, byZip, 'All segments', [], scoped);
+    expect(merged.features).toHaveLength(1);
+    expect(merged.features[0]?.properties?.audienceCount).toBe(1200);
+  });
 });

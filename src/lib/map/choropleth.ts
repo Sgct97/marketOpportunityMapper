@@ -5,7 +5,8 @@ export type Rgb = [number, number, number];
 /** Multi-stop fill ramp tuned for presentation maps (subtle low end, rich high end). */
 export function choroplethFillPaint(
   rgb: Rgb,
-  maxCount: number
+  maxCount: number,
+  theme: 'dark' | 'light' = 'dark'
 ): FillLayerSpecification['paint'] {
   const [r, g, b] = rgb;
   if (maxCount <= 0) {
@@ -16,27 +17,30 @@ export function choroplethFillPaint(
   }
 
   const m = maxCount;
-  // The choropleth renders BENEATH the basemap labels, so place names stay
-  // legible. Alphas are kept moderate so roads/geography still read through
-  // the heat instead of flattening into a solid block.
-  return {
+  const ramp: FillLayerSpecification['paint'] = {
     'fill-color': [
-      'interpolate',
-      ['linear'],
-      ['get', 'audienceCount'],
-      1,
-      ['rgba', r, g, b, 0.12],
-      m * 0.2,
-      ['rgba', r, g, b, 0.26],
-      m * 0.45,
-      ['rgba', r, g, b, 0.42],
-      m * 0.7,
-      ['rgba', r, g, b, 0.58],
-      m,
-      ['rgba', r, g, b, 0.74],
+      'case',
+      ['boolean', ['get', 'excluded'], false],
+      theme === 'light' ? 'rgba(100, 116, 139, 0.22)' : 'rgba(148, 163, 184, 0.18)',
+      [
+        'interpolate',
+        ['linear'],
+        ['get', 'audienceCount'],
+        1,
+        ['rgba', r, g, b, 0.12],
+        m * 0.2,
+        ['rgba', r, g, b, 0.26],
+        m * 0.45,
+        ['rgba', r, g, b, 0.42],
+        m * 0.7,
+        ['rgba', r, g, b, 0.58],
+        m,
+        ['rgba', r, g, b, 0.74],
+      ],
     ],
-    'fill-opacity': 1,
+    'fill-opacity': ['case', ['boolean', ['get', 'excluded'], false], 0.55, 1],
   };
+  return ramp;
 }
 
 export function choroplethLinePaint(
@@ -49,16 +53,21 @@ export function choroplethLinePaint(
   return {
     'line-color': [
       'case',
-      ['boolean', ['feature-state', 'hover'], false],
-      `rgb(${r},${g},${b})`,
-      restColor,
+      ['boolean', ['get', 'excluded'], false],
+      theme === 'light' ? 'rgba(100, 116, 139, 0.35)' : 'rgba(148, 163, 184, 0.28)',
+      [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        `rgb(${r},${g},${b})`,
+        restColor,
+      ],
     ],
     'line-width': [
       'case',
-      ['boolean', ['feature-state', 'hover'], false],
-      2.5,
-      0.7,
+      ['boolean', ['get', 'excluded'], false],
+      0.5,
+      ['case', ['boolean', ['feature-state', 'hover'], false], 2.5, 0.7],
     ],
-    'line-opacity': 1,
+    'line-opacity': ['case', ['boolean', ['get', 'excluded'], false], 0.65, 1],
   };
 }

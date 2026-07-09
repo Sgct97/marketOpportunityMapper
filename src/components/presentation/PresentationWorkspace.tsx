@@ -10,12 +10,21 @@ import type { AudienceZipRow } from '@/lib/audience/aggregate';
 import { buildDashboardModel } from '@/lib/audience/dashboard';
 import { computeMarketAnalysis } from '@/lib/audience/market-analysis';
 import {
+  filterRowsByExcludedZips,
+  toggleExcludedZip,
+} from '@/lib/audience/zip-exclude';
+import {
+  buildReachScopeCopy,
+  filterRowsBySelectedTypes,
+} from '@/lib/audience/presentation-scope';
+import {
   clientDealerships,
   competitorDealerships,
 } from '@/lib/dealership/filter';
 import type { DealershipRow } from '@/lib/dealership/types';
 import { agencyAccent, resolveBrandAccent } from '@/lib/brands';
 import { getAgencyBrand } from '@/lib/agency-brand';
+import { buildZipLabelMap } from '@/lib/map/zip-labels';
 import { fetchZipBoundaries } from '@/lib/map/boundaries';
 import { centroidsFromBoundaries } from '@/lib/map/centroids';
 import type { LatLng } from '@/lib/map/centroids';
@@ -115,6 +124,22 @@ export function PresentationWorkspace({
     parsed.showCompetitorLayer !== false
   );
   const [showRadiusLayer, setShowRadiusLayer] = useState(parsed.showRadiusLayer !== false);
+  const [excludedZips, setExcludedZips] = useState<string[]>(parsed.excludedZips ?? []);
+
+  const activeRows = useMemo(
+    () => filterRowsByExcludedZips(rows, excludedZips),
+    [rows, excludedZips]
+  );
+
+  const mapScopeRows = useMemo(
+    () => filterRowsBySelectedTypes(activeRows, selectedTypes),
+    [activeRows, selectedTypes]
+  );
+
+  const reachScope = useMemo(
+    () => buildReachScopeCopy(selectedTypes.length, audienceTypes.length),
+    [selectedTypes.length, audienceTypes.length]
+  );
 
   const focusDealership = useMemo(
     () => clientOptions.find(d => d.id === focusDealershipId) ?? null,
@@ -144,8 +169,8 @@ export function PresentationWorkspace({
   const brand = accentSource === 'agency' ? agencyBrand : vehicleBrand;
 
   const aggregate = useMemo(
-    () => aggregateAudienceByZip(rows, selectedTypes),
-    [rows, selectedTypes]
+    () => aggregateAudienceByZip(activeRows, selectedTypes),
+    [activeRows, selectedTypes]
   );
 
   const typeLabel =
@@ -163,6 +188,8 @@ export function PresentationWorkspace({
     () => Array.from(new Set(rows.filter(r => r.audience_count > 0).map(r => r.zip))).sort(),
     [rows]
   );
+
+  const zipLabels = useMemo(() => buildZipLabelMap(allDataZips), [allDataZips]);
 
   const [zipCentroids, setZipCentroids] = useState<Record<string, LatLng>>({});
 
@@ -204,20 +231,20 @@ export function PresentationWorkspace({
     });
   }, [aggregate.byZip, zipCentroids, focusDealership, radiusMiles, competitorsForMap, selectedTypes.length]);
 
-  // Dashboard always uses the full dataset (all segments) and all competitors,
-  // independent of the map's filters.
+  // Dashboard and PDF use the same scope as the map: selected segments,
+  // excluded ZIPs, trade-area radius, and competitor layer visibility.
   const dashboardModel = useMemo(
     () =>
       buildDashboardModel({
-        rows,
+        rows: mapScopeRows,
         zipCentroids,
         focus: focusDealership
           ? { latitude: focusDealership.latitude, longitude: focusDealership.longitude }
           : null,
         radiusMiles,
-        competitors: competitorOptions,
+        competitors: competitorsForMap,
       }),
-    [rows, zipCentroids, focusDealership, radiusMiles, competitorOptions]
+    [mapScopeRows, zipCentroids, focusDealership, radiusMiles, competitorsForMap]
   );
 
   const persistSettings = useCallback(
@@ -289,9 +316,12 @@ export function PresentationWorkspace({
       radiusMiles,
       model: dashboardModel,
       mapImage: image,
+      zipLabels,
+      reachScope,
+      competitorsInScope: showCompetitorLayer && competitorOptions.length > 0,
     });
     doc.save(`${slugify(projectName)}-market-report.pdf`);
-  }, [captureExportImage, brand, brandId, projectName, datasetLabel, focusDealership, radiusMiles, dashboardModel]);
+  }, [captureExportImage, brand, brandId, projectName, datasetLabel, focusDealership, radiusMiles, dashboardModel, zipLabels, reachScope, showCompetitorLayer, competitorOptions.length]);
 
   function toggleType(type: string) {
     setSelectedTypes(prev =>
@@ -317,6 +347,22 @@ export function PresentationWorkspace({
     setAccentSource(source);
     persistSettings({ accentSource: source });
   }
+
+  const handleToggleZipExcluded = useCallback(
+    (zip: string) => {
+      setExcludedZips(prev => {
+        const next = toggleExcludedZip(prev, zip);
+        persistSettings({ excludedZips: next });
+        return next;
+      });
+    },
+    [persistSettings]
+  );
+
+  const handleRestoreAllZips = useCallback(() => {
+    setExcludedZips([]);
+    persistSettings({ excludedZips: [] });
+  }, [persistSettings]);
 
   const contextLabel = focusDealership
     ? `${focusDealership.name} · ${radiusMiles} mi radius`
@@ -362,6 +408,11 @@ export function PresentationWorkspace({
             active={view === 'map'}
             theme={theme}
             rows={rows}
+            zipLabels={zipLabels}
+            zipCentroids={zipCentroids}
+            excludedZips={excludedZips}
+            onToggleZipExcluded={handleToggleZipExcluded}
+            onRestoreAllZips={handleRestoreAllZips}
             selectedTypes={selectedTypes}
             primaryColor={accentColor}
             typeLabel={typeLabel}
@@ -418,11 +469,15 @@ export function PresentationWorkspace({
           <div className="flex flex-1 min-h-0">
             <DashboardView
               model={dashboardModel}
+              zipLabels={zipLabels}
               glow={accentColor}
               brandName={brand.name}
               datasetLabel={datasetLabel}
               focusName={focusDealership?.name ?? null}
               radiusMiles={radiusMiles}
+              reachScope={reachScope}
+              competitorsInScope={showCompetitorLayer && competitorOptions.length > 0}
+              excludedZipCount={excludedZips.length}
             />
           </div>
         )}
