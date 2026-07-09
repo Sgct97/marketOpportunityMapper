@@ -1,5 +1,10 @@
 import type { Feature, FeatureCollection, Point, Polygon } from 'geojson';
-import type maplibregl from 'maplibre-gl';
+import type {
+  CircleLayerSpecification,
+  GeoJSONSource,
+  Map as MapLibreMap,
+  SymbolLayerSpecification,
+} from 'maplibre-gl';
 import { competitorPinColor, competitorPinLabelColor } from '@/lib/brands';
 import { clientDealerships, competitorDealerships } from '@/lib/dealership/filter';
 import { rankCompetitors } from '@/lib/dealership/rank-competitors';
@@ -92,7 +97,7 @@ function rankedCompetitorsToGeoJson(
   return { type: 'FeatureCollection', features };
 }
 
-function competitorPinPaint(): maplibregl.CirclePaint {
+function competitorPinPaint(): NonNullable<CircleLayerSpecification['paint']> {
   return {
     'circle-color': ['coalesce', ['get', 'pinColor'], '#9FB1C9'],
     'circle-radius': 7,
@@ -102,7 +107,7 @@ function competitorPinPaint(): maplibregl.CirclePaint {
   };
 }
 
-function competitorLabelPaint(): maplibregl.SymbolPaint {
+function competitorLabelPaint(): NonNullable<SymbolLayerSpecification['paint']> {
   return {
     'text-color': ['coalesce', ['get', 'labelColor'], '#FFFFFF'],
     'text-halo-color': 'rgba(7,11,21,0.75)',
@@ -130,20 +135,20 @@ export function radiusToGeoJson(
   };
 }
 
-function removeLegacyDealershipLayer(map: maplibregl.Map) {
+function removeLegacyDealershipLayer(map: MapLibreMap) {
   if (map.getLayer(LEGACY_DEALERSHIP_LAYER)) {
     map.removeLayer(LEGACY_DEALERSHIP_LAYER);
   }
 }
 
-function removeLegacyClientDealershipLayer(map: maplibregl.Map) {
+function removeLegacyClientDealershipLayer(map: MapLibreMap) {
   const layer = map.getLayer(CLIENT_DEALERSHIP_LAYER);
   if (layer?.type === 'circle') {
     map.removeLayer(CLIENT_DEALERSHIP_LAYER);
   }
 }
 
-function ensureClientDealershipHalo(map: maplibregl.Map, clientColor: string) {
+function ensureClientDealershipHalo(map: MapLibreMap, clientColor: string) {
   if (!map.getLayer(CLIENT_DEALERSHIP_HALO_LAYER)) {
     map.addLayer({
       id: CLIENT_DEALERSHIP_HALO_LAYER,
@@ -162,11 +167,11 @@ function ensureClientDealershipHalo(map: maplibregl.Map, clientColor: string) {
   }
 }
 
-function ensureClientDealershipStar(map: maplibregl.Map, clientColor: string) {
+function ensureClientDealershipStar(map: MapLibreMap, clientColor: string) {
   ensureClientStarImage(map, clientColor);
   removeLegacyClientDealershipLayer(map);
 
-  const clientStarLayout: maplibregl.SymbolLayout = {
+  const clientStarLayout: NonNullable<SymbolLayerSpecification['layout']> = {
     'icon-image': CLIENT_STAR_IMAGE_ID,
     'icon-size': ['case', ['boolean', ['get', 'focused'], false], 1.08, 0.86],
     'icon-allow-overlap': true,
@@ -188,7 +193,7 @@ function ensureClientDealershipStar(map: maplibregl.Map, clientColor: string) {
   }
 }
 
-export function ensureDealershipLayers(map: maplibregl.Map, clientColor: string) {
+export function ensureDealershipLayers(map: MapLibreMap, clientColor: string) {
   removeLegacyDealershipLayer(map);
 
   if (!map.getSource('radius-areas')) {
@@ -292,7 +297,7 @@ export function ensureDealershipLayers(map: maplibregl.Map, clientColor: string)
 }
 
 export function setLayerVisibility(
-  map: maplibregl.Map,
+  map: MapLibreMap,
   layerIds: string[],
   visible: boolean
 ) {
@@ -304,7 +309,7 @@ export function setLayerVisibility(
 }
 
 export function updateDealershipSources(
-  map: maplibregl.Map,
+  map: MapLibreMap,
   options: {
     dealers: DealershipRow[];
     focusDealershipId: string | null;
@@ -319,21 +324,19 @@ export function updateDealershipSources(
   const competitors = competitorDealerships(options.dealers, focusClient);
   const rankedCompetitors = rankCompetitors(competitors, focusClient);
 
-  const clientSource = map.getSource(CLIENT_DEALERSHIP_SOURCE) as
-    | maplibregl.GeoJSONSource
-    | undefined;
+  const clientSource = map.getSource(CLIENT_DEALERSHIP_SOURCE) as GeoJSONSource | undefined;
   clientSource?.setData(
     dealershipsToGeoJson(clients, options.focusDealershipId)
   );
 
   const competitorSource = map.getSource(COMPETITOR_DEALERSHIP_SOURCE) as
-    | maplibregl.GeoJSONSource
+    | GeoJSONSource
     | undefined;
   competitorSource?.setData(
     rankedCompetitorsToGeoJson(rankedCompetitors, options.theme ?? 'dark')
   );
 
-  const radiusSource = map.getSource('radius-areas') as maplibregl.GeoJSONSource | undefined;
+  const radiusSource = map.getSource('radius-areas') as GeoJSONSource | undefined;
   if (!options.showRadius || !options.focusDealershipId) {
     radiusSource?.setData({ type: 'FeatureCollection', features: [] });
     return;
