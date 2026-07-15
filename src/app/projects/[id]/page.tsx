@@ -64,7 +64,12 @@ export default async function ProjectPage({ params }: Props) {
   const clientReady = Boolean(clientDealer?.latitude && clientDealer?.longitude);
 
   return (
-    <PageChrome title="Project setup" backHref="/" backLabel="Projects">
+    <PageChrome
+      title="Project setup"
+      backHref="/"
+      backLabel="Projects"
+      agencyId={project.brand_id ?? 'dealer-media-house'}
+    >
       <main className="max-w-4xl mx-auto px-6 py-10 mom-fade-up">
         <form
           action={rename}

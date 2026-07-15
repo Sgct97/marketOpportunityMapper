@@ -125,6 +125,7 @@ export function PresentationWorkspace({
   );
   const [showRadiusLayer, setShowRadiusLayer] = useState(parsed.showRadiusLayer !== false);
   const [excludedZips, setExcludedZips] = useState<string[]>(parsed.excludedZips ?? []);
+  const [showComposition, setShowComposition] = useState(true);
 
   const activeRows = useMemo(
     () => filterRowsByExcludedZips(rows, excludedZips),
@@ -318,10 +319,10 @@ export function PresentationWorkspace({
       mapImage: image,
       zipLabels,
       reachScope,
-      competitorsInScope: showCompetitorLayer && competitorOptions.length > 0,
+      includeComposition: showComposition,
     });
     doc.save(`${slugify(projectName)}-market-report.pdf`);
-  }, [captureExportImage, brand, brandId, projectName, datasetLabel, focusDealership, radiusMiles, dashboardModel, zipLabels, reachScope, showCompetitorLayer, competitorOptions.length]);
+  }, [captureExportImage, brand, brandId, projectName, datasetLabel, focusDealership, radiusMiles, dashboardModel, zipLabels, reachScope, showComposition]);
 
   function toggleType(type: string) {
     setSelectedTypes(prev =>
@@ -388,7 +389,12 @@ export function PresentationWorkspace({
   const accentColor = theme === 'light' ? brand.primaryColor : brand.glow;
 
   return (
-    <div className="mom-canvas flex flex-col h-screen" data-theme={theme} style={brandVars}>
+    <div
+      className="mom-canvas flex flex-col h-screen"
+      data-theme={theme}
+      data-agency={brandId}
+      style={brandVars}
+    >
       <PresentationHeader
         projectId={projectId}
         projectName={projectName}
@@ -476,8 +482,9 @@ export function PresentationWorkspace({
               focusName={focusDealership?.name ?? null}
               radiusMiles={radiusMiles}
               reachScope={reachScope}
-              competitorsInScope={showCompetitorLayer && competitorOptions.length > 0}
               excludedZipCount={excludedZips.length}
+              showComposition={showComposition}
+              onShowCompositionChange={setShowComposition}
             />
           </div>
         )}

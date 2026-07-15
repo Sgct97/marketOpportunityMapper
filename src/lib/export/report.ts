@@ -31,8 +31,9 @@ export interface ReportInput {
   zipLabels?: Record<string, ZipLabel>;
   /** Mirrors the map segment scope for hero copy. */
   reachScope?: ReachScopeCopy;
-  competitorsInScope?: boolean;
   excludedZipCount?: number;
+  /** When false, omit Audience composition donuts from the PDF. Defaults to true. */
+  includeComposition?: boolean;
   generatedAt?: Date;
 }
 
@@ -76,6 +77,30 @@ function formatDate(d: Date): string {
 }
 
 /**
+ * Page-1 height when composition donuts are omitted.
+ * Mirrors the y-advancement in buildMarketReport's page-1 body (hero → KPIs)
+ * so we can set MediaBox BEFORE drawing (required for correct PDF coords).
+ */
+export function estimatePage1HeightWithoutComposition(leadSegmentName: string | null): number {
+  const probe = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+  let y = 58;
+  // Hero block
+  y += 16 + 9 + 6 + 8;
+  if (leadSegmentName) {
+    y += 7 + 8;
+    probe.setFont('helvetica', 'bold');
+    probe.setFontSize(11);
+    const nameLines = probe.splitTextToSize(leadSegmentName, CONTENT_W);
+    y += nameLines.length * 5.2 + 1 + 8;
+  }
+  // Concentration callout + 2x2 KPI grid
+  y += 16;
+  y += 28 + 4 + 28 + 12;
+  // Footer band under last content
+  return Math.min(PAGE_H, Math.max(y + 20, HEADER_H + 90));
+}
+
+/**
  * Build a branded, print-ready market opportunity report from the SAME model
  * that drives the live dashboard plus a snapshot of the current map. Returns a
  * jsPDF document ready to `.save()`.
@@ -93,8 +118,8 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     mapImage,
     zipLabels = {},
     reachScope,
-    competitorsInScope = true,
     excludedZipCount = 0,
+    includeComposition = true,
   } = input;
   const generatedAt = input.generatedAt ?? new Date();
   const scopeCopy = reachScope ?? {
@@ -128,6 +153,16 @@ export function buildMarketReport(input: ReportInput): jsPDF {
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
   doc.setFont('helvetica', 'normal');
+
+  // When composition is off, page 1 must be short — but the height MUST be set
+  // BEFORE any drawing. jsPDF bakes y→PDF transforms using the current page
+  // height at draw time; shrinking after drawing leaves a full-A4 layout inside
+  // a short MediaBox (clipped top / wrong gaps). Map stays on page 2 at full A4.
+  const facetsForPage1 = includeComposition ? model.composition.slice(0, 2) : [];
+  const omitComposition = facetsForPage1.length === 0;
+  if (omitComposition) {
+    doc.internal.pageSize.height = estimatePage1HeightWithoutComposition(leadSegment?.name ?? null);
+  }
 
   // ── helpers bound to this doc ──────────────────────────────────────────
   const setFill = (c: Rgb) => doc.setFillColor(c[0], c[1], c[2]);
@@ -195,34 +230,8 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     doc.line(lockX, logoY + 1, lockX, logoY + logoH - 1);
     const idX = lockX + 8;
 
-    // Cap the brand pill so it can never crowd out the title.
-    const panelW = 58;
-
-    // Brand pill (OEM accent) — anchors the header to the accent-driven body.
-    // Sits on the "test13" title row so it reads as a chip beside the title.
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
-    const pillLabel = brand.name;
-    const dotR = 1.15;
-    const padX = 4.4;
-    const dotGap = 2.4;
-    const textW = doc.getTextWidth(pillLabel);
-    const pillW = Math.min(panelW, padX + dotR * 2 + dotGap + textW + padX);
-    const pillH = 8.5;
-    const pillX = PAGE_W - MARGIN - pillW;
-    const pillY = bandMid + 4 - pillH / 2;
-    setFill(accentSoft);
-    setStroke(accentLine);
-    doc.setLineWidth(0.25);
-    doc.roundedRect(pillX, pillY, pillW, pillH, pillH / 2, pillH / 2, 'FD');
-    setFill(accent);
-    doc.circle(pillX + padX + dotR, pillY + pillH / 2, dotR, 'F');
-    setText(accent);
-    doc.text(pillLabel, pillX + padX + dotR * 2 + dotGap, pillY + pillH / 2 + 1.2, { maxWidth: textW + 1 });
-
-    // ── Center: report identity lockup (kicker + project), filling the band ──
-    // Title room runs up to the brand pill's left edge, not the full panel.
-    const idMaxW = pillX - 6 - idX;
+    // ── Center: report identity lockup (kicker + project) ──
+    const idMaxW = PAGE_W - MARGIN - idX;
     setFill(accent);
     doc.circle(idX + 1.1, bandMid - 6.6, 1.15, 'F');
     doc.setFont('helvetica', 'bold');
@@ -244,14 +253,15 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   }
 
   function footer(pageLabel: string) {
+    const h = doc.internal.pageSize.getHeight();
     setStroke(LINE);
     doc.setLineWidth(0.2);
-    doc.line(MARGIN, PAGE_H - 14, PAGE_W - MARGIN, PAGE_H - 14);
+    doc.line(MARGIN, h - 14, PAGE_W - MARGIN, h - 14);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     setText(FAINT);
-    doc.text(agencyBrand.name, MARGIN, PAGE_H - 9);
-    doc.text(pageLabel, PAGE_W - MARGIN, PAGE_H - 9, { align: 'right' });
+    doc.text(agencyBrand.name, MARGIN, h - 9);
+    doc.text(pageLabel, PAGE_W - MARGIN, h - 9, { align: 'right' });
   }
 
   // KPI card
@@ -366,7 +376,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   doc.setFontSize(8.5);
   setText(FAINT);
   const reachMeta = `${scopeCopy.segmentPhrase} · ${formatNumber(heroZips)} ZIPs · overlapping${
-    useTradeArea ? ` · within ${radiusMiles} mi of ${subjectName}` : ' · across the market'
+    useTradeArea ? ` · within ${radiusMiles} mi` : ' · across the market'
   }${excludedZipCount > 0 ? ` · ${formatNumber(excludedZipCount)} ZIP${excludedZipCount === 1 ? '' : 's'} excluded` : ''}`;
   doc.text(reachMeta, MARGIN, y);
   y += 8;
@@ -438,22 +448,18 @@ export function buildMarketReport(input: ReportInput): jsPDF {
       kh,
       'ZIPs in trade area',
       formatNumber(heroZips),
-      `within ${radiusMiles} mi of ${subjectName}`
+      `within ${radiusMiles} mi`
     );
   } else {
     kpiCard(MARGIN + kw + gap, y, kw, kh, 'Lead segment share', model.topSegment ? formatPercent(model.topSegment.share) : EMPTY_VALUE, model.topSegment?.name ?? 'No segments');
   }
   y += kh + gap;
   kpiCard(MARGIN, y, kw, kh, 'Market concentration', formatPercent(conc.top5Share), `from the top 5 ZIPs · ${formatNumber(conc.zipsForHalf)} ZIPs make up half`);
-  if (model.competitive.competitorCount > 0) {
-    kpiCard(MARGIN + kw + gap, y, kw, kh, 'Competitive field', formatNumber(model.competitive.competitorCount), `rival stores · ${formatNumber(model.competitive.whiteSpace.length)} white-space ZIPs`);
-  } else {
-    kpiCard(MARGIN + kw + gap, y, kw, kh, 'Segments in file', formatNumber(model.segmentCount), 'distinct audience segments');
-  }
+  kpiCard(MARGIN + kw + gap, y, kw, kh, 'Segments in file', formatNumber(model.segmentCount), 'distinct audience segments');
   y += kh + 12;
 
   // Audience composition (up to 2 facets) — donut + legend, like the dashboard.
-  const facets = model.composition.slice(0, 2);
+  const facets = facetsForPage1;
   if (facets.length > 0) {
     eyebrow('Audience composition · grouped from segment names', MARGIN, y);
     y += 6;
@@ -494,15 +500,17 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     y += cardH + 8;
   }
 
-  footer(`Page 1 of ${mapImage ? 2 : 1}  ·  Generated ${formatDate(generatedAt)}`);
+  // Page 1 ends after KPIs / optional composition — map stays on page 2 (full size).
+  const totalPages = mapImage ? 2 : 1;
+  footer(`Page 1 of ${totalPages}  ·  Generated ${formatDate(generatedAt)}`);
 
-  // ═══════════════════════ PAGE 2 — Map & breakdown ══════════════════════
+  // ═══════════════════════ PAGE 2 — Map & breakdown (full size) ══════════════════════
   if (mapImage) {
-    doc.addPage();
+    doc.addPage([PAGE_W, PAGE_H], 'portrait');
     drawHeaderBand();
     y = 56;
 
-    // Map snapshot, aspect-fit within content width, capped height.
+    // Map snapshot at full report width — aspect-fit, capped height (never squeezed).
     eyebrow('Market map', MARGIN, y);
     y += 4;
     const ar = mapImage.height / mapImage.width;
@@ -513,7 +521,6 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     try {
       doc.addImage(mapImage.dataUrl, 'PNG', MARGIN, y, imgW, imgH, undefined, 'FAST');
     } catch {
-      // If the image can't be embedded, leave a labeled placeholder.
       setFill(SURFACE);
       doc.rect(MARGIN, y, imgW, imgH, 'F');
     }
@@ -531,15 +538,12 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     doc.text(caption, MARGIN, y + 2);
     y += 10;
 
-    // Two columns: segment breakdown (left) + top ZIPs (right)
     const colGap = 8;
     const leftW = CONTENT_W * 0.56;
     const rightW = CONTENT_W - leftW - colGap;
     const rightX = MARGIN + leftW + colGap;
-    const tableTop = y;
-
-    drawSegmentTable(MARGIN, tableTop, leftW, activeSegments, heroReach);
-    drawTopZips(rightX, tableTop, rightW, topZips, topZipsScope);
+    drawSegmentTable(MARGIN, y, leftW, activeSegments, heroReach);
+    drawTopZips(rightX, y, rightW, topZips, topZipsScope);
 
     footer(`Page 2 of 2  ·  Generated ${formatDate(generatedAt)}`);
   }
@@ -584,32 +588,39 @@ export function buildMarketReport(input: ReportInput): jsPDF {
 
   function drawTopZips(x: number, top: number, w: number, zips: TopZip[], scope: string) {
     eyebrow(`Top ${TOP_ZIP_DISPLAY_COUNT} ZIP codes · ${scope}`, x, top);
-    let ty = top + 8;
+    let ty = top + 6;
     if (zips.length === 0) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
       setText(MUTED);
-      doc.text('No ZIP data available.', x, ty);
+      doc.text('No ZIP data available.', x, ty + 2);
       return;
     }
+    doc.setFontSize(7.5);
+    setText(FAINT);
+    doc.text(`${Math.min(zips.length, TOP_ZIP_DISPLAY_COUNT)} shown`, x, ty);
+    ty += 5;
     const max = zips[0]?.count ?? 1;
     zips.slice(0, TOP_ZIP_DISPLAY_COUNT).forEach((z, i) => {
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
-      setText(i === 0 ? accent : FAINT);
-      doc.text(String(i + 1), x, ty);
+      doc.setFontSize(8);
+      setText(MUTED);
+      doc.text(String(i + 1).padStart(2, '0'), x, ty);
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
       setText(INK2);
       const zipLabel = formatZipDisplay(z.zip, zipLabels);
-      const zipLines: string[] = doc.splitTextToSize(zipLabel, w - 34);
-      doc.text(zipLines[0] ?? zipLabel, x + 5, ty);
+      const name = doc.splitTextToSize(zipLabel, w - 42)[0] ?? zipLabel;
+      doc.text(name, x + 8, ty);
       doc.setFont('helvetica', 'bold');
       setText(INK);
-      doc.text(formatNumber(z.count), x + w, ty, { align: 'right' });
+      doc.text(formatNumber(z.count), x + w - 16, ty, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      setText(FAINT);
+      doc.text(formatPercent(z.share), x + w, ty, { align: 'right' });
       ty += 2;
-      bar(x + 16, ty, w - 28, z.count / max);
-      ty += 7;
+      bar(x, ty, w, z.count / max);
+      ty += 6.5;
     });
   }
 

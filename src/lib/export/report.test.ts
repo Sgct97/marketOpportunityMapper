@@ -3,7 +3,18 @@ import { writeFileSync } from 'node:fs';
 import { defaultAgencyBrand, loadLogoDataUrl } from '@/lib/agency-brand';
 import { resolveBrandAccent } from '@/lib/brands';
 import type { DashboardModel } from '@/lib/audience/dashboard';
-import { buildMarketReport } from './report';
+import {
+  buildMarketReport,
+  estimatePage1HeightWithoutComposition,
+} from './report';
+
+function pdfPageHeightsMm(data: ArrayBuffer): number[] {
+  const raw = Buffer.from(data).toString('latin1');
+  return [...raw.matchAll(/\/MediaBox\s*\[\s*([^\]]+)\]/g)].map(m => {
+    const nums = m[1].trim().split(/\s+/).map(Number);
+    return ((nums[3] - nums[1]) * 25.4) / 72;
+  });
+}
 
 // A 1x1 transparent PNG — stands in for the captured map canvas in tests.
 const TINY_PNG =
@@ -109,7 +120,7 @@ describe('buildMarketReport', () => {
     if (process.env.WRITE_PDF) writeFileSync('/tmp/mom-report.pdf', buf);
   });
 
-  it('produces a single page when no map image is available', async () => {
+  it('produces a single page when no map image is available', () => {
     const doc = buildMarketReport({
       brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
       agencyBrand: defaultAgencyBrand,
@@ -119,9 +130,109 @@ describe('buildMarketReport', () => {
       radiusMiles: 25,
       model,
       mapImage: null,
+      includeComposition: false,
       generatedAt: new Date('2026-06-16T00:00:00Z'),
     });
 
     expect(doc.getNumberOfPages()).toBe(1);
+  });
+
+  it('omits composition charts when includeComposition is false', async () => {
+    const withComposition = buildMarketReport({
+      brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
+      agencyBrand: defaultAgencyBrand,
+      projectName: 'Fontana Hyundai',
+      datasetLabel: null,
+      focusName: null,
+      radiusMiles: 25,
+      model,
+      mapImage: null,
+      includeComposition: true,
+      generatedAt: new Date('2026-06-16T00:00:00Z'),
+    });
+    const withoutComposition = buildMarketReport({
+      brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
+      agencyBrand: defaultAgencyBrand,
+      projectName: 'Fontana Hyundai',
+      datasetLabel: null,
+      focusName: null,
+      radiusMiles: 25,
+      model,
+      mapImage: null,
+      includeComposition: false,
+      generatedAt: new Date('2026-06-16T00:00:00Z'),
+    });
+
+    const withBuf = Buffer.from(withComposition.output('arraybuffer'));
+    const withoutBuf = Buffer.from(withoutComposition.output('arraybuffer'));
+    expect(withoutBuf.length).toBeLessThan(withBuf.length);
+  });
+
+  it('keeps the map on page 2 at full size and shortens page 1 MediaBox when composition is off', () => {
+    const withComposition = buildMarketReport({
+      brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
+      agencyBrand: defaultAgencyBrand,
+      projectName: 'Fontana Hyundai',
+      datasetLabel: null,
+      focusName: 'CardinaleWay Hyundai - Glendora',
+      radiusMiles: 15,
+      model,
+      mapImage: { dataUrl: TINY_PNG, width: 1600, height: 1000 },
+      includeComposition: true,
+      generatedAt: new Date('2026-06-16T00:00:00Z'),
+    });
+    const withoutComposition = buildMarketReport({
+      brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
+      agencyBrand: defaultAgencyBrand,
+      projectName: 'Fontana Hyundai',
+      datasetLabel: null,
+      focusName: 'CardinaleWay Hyundai - Glendora',
+      radiusMiles: 15,
+      model,
+      mapImage: { dataUrl: TINY_PNG, width: 1600, height: 1000 },
+      includeComposition: false,
+      generatedAt: new Date('2026-06-16T00:00:00Z'),
+    });
+
+    expect(withComposition.getNumberOfPages()).toBe(2);
+    expect(withoutComposition.getNumberOfPages()).toBe(2);
+
+    const withHeights = pdfPageHeightsMm(withComposition.output('arraybuffer'));
+    const withoutHeights = pdfPageHeightsMm(withoutComposition.output('arraybuffer'));
+
+    // File bytes: page 1 MediaBox is short when donuts are off; page 2 stays A4.
+    expect(withoutHeights[0]).toBeLessThan(260);
+    expect(withoutHeights[0]).toBeGreaterThan(180);
+    expect(withoutHeights[1]).toBeCloseTo(297, 0);
+
+    // Composition on → both pages full A4.
+    expect(withHeights[0]).toBeCloseTo(297, 0);
+    expect(withHeights[1]).toBeCloseTo(297, 0);
+
+    // Height was applied before draw (matches estimator).
+    const expected = estimatePage1HeightWithoutComposition(
+      model.tradeArea?.leadSegment?.name ?? model.topSegment?.name ?? null
+    );
+    expect(withoutHeights[0]).toBeCloseTo(expected, 0);
+  });
+
+  it('does not put the focus dealer name in the trade-area KPI subtext', () => {
+    const focusName = 'CardinaleWay Hyundai - Glendora';
+    const doc = buildMarketReport({
+      brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
+      agencyBrand: defaultAgencyBrand,
+      projectName: 'test2',
+      datasetLabel: null,
+      focusName,
+      radiusMiles: 15,
+      model,
+      mapImage: null,
+      includeComposition: false,
+      generatedAt: new Date('2026-07-15T00:00:00Z'),
+    });
+
+    const raw = Buffer.from(doc.output('arraybuffer')).toString('latin1');
+    expect(raw.includes('within 15 mi')).toBe(true);
+    expect(raw.includes(`of ${focusName}`)).toBe(false);
   });
 });
