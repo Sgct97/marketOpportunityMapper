@@ -754,7 +754,7 @@ export function OpportunityMap({
 
       {isEmptySelection && selectedTypes.length === 0 && (
         <div
-          className="absolute inset-0 z-10 flex items-center justify-center backdrop-blur-[2px] pointer-events-none"
+          className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none"
           style={{ background: 'var(--map-veil)' }}
         >
           <p className="text-sm text-[var(--muted)]">Select at least one audience segment</p>
