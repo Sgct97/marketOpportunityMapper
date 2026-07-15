@@ -250,6 +250,7 @@ body {
 
 /* ──────────────────────────────────────────────────────────────────────────
    Dealer Media House agency skin — visual only (colors + fonts).
+   Flat brand surfaces (no glass/saturate wash) so hexes read true.
    Applied when the project/shell agency is DMH. DDUS keeps the neutral tokens.
    ────────────────────────────────────────────────────────────────────────── */
 .mom-canvas[data-agency="dealer-media-house"] {
@@ -260,8 +261,8 @@ body {
   /* Brand accent tokens — used when OEM accent isn't injected (setup/home). */
   --brand-primary: #003c46;
   --brand-primary-dark: #002a31;
-  --brand-primary-soft: rgba(0, 60, 70, 0.12);
-  --brand-primary-line: rgba(0, 60, 70, 0.38);
+  --brand-primary-soft: rgba(0, 175, 175, 0.16);
+  --brand-primary-line: rgba(0, 175, 175, 0.45);
   --brand-glow: #00afaf;
   --brand-glow-deep: #008f8f;
   --brand-glow-soft: rgba(0, 175, 175, 0.16);
@@ -271,48 +272,58 @@ body {
   font-family: var(--font-body);
   font-weight: 400;
 
-  /* Dark: primary navy/teal field, white type, secondary teal accent */
+  /* Dark: flat primary field, white type, secondary teal accent */
   --ink: #ffffff;
-  --ink-2: rgba(255, 255, 255, 0.88);
-  --muted: rgba(255, 255, 255, 0.7);
-  --faint: rgba(255, 255, 255, 0.55);
-  --line: rgba(255, 255, 255, 0.12);
-  --line-soft: rgba(255, 255, 255, 0.07);
-  --surface: rgba(255, 255, 255, 0.06);
-  --surface-2: rgba(255, 255, 255, 0.04);
+  --ink-2: #e8f4f4;
+  --muted: #a8c5c5;
+  --faint: #7a9a9a;
+  --line: rgba(0, 175, 175, 0.28);
+  --line-soft: rgba(255, 255, 255, 0.08);
+  --surface: #014852;
+  --surface-2: #013f48;
   --canvas: #003c46;
 
-  --card-grad-top: rgba(255, 255, 255, 0.08);
-  --card-grad-bottom: rgba(33, 35, 31, 0.35);
-  --inset-grad-top: rgba(255, 255, 255, 0.05);
-  --inset-grad-bottom: rgba(33, 35, 31, 0.25);
+  --card-grad-top: #014852;
+  --card-grad-bottom: #014852;
+  --card-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 24px -16px rgba(0, 0, 0, 0.55);
+  --inset-grad-top: #013f48;
+  --inset-grad-bottom: #013f48;
 
-  --topbar-grad: linear-gradient(180deg, rgba(0, 60, 70, 0.92), rgba(33, 35, 31, 0.78));
-  --panel-grad: linear-gradient(180deg, rgba(0, 60, 70, 0.88), rgba(33, 35, 31, 0.9));
+  --track: rgba(0, 175, 175, 0.18);
+  --bar-glow: none;
+  --accent-text-glow: none;
 
-  --map-backdrop: #21231f;
-  --map-veil: rgba(33, 35, 31, 0.78);
-  --chip-bg: rgba(0, 60, 70, 0.92);
-  --ctrl-bg: rgba(0, 60, 70, 0.9);
-  --attrib-bg: rgba(33, 35, 31, 0.75);
-  --attrib-text: rgba(255, 255, 255, 0.55);
+  --seg-bg: #013f48;
+  --seg-shadow: none;
+  --seg-active-bg: #015a66;
+  --seg-active-shadow: none;
+
+  --topbar-grad: #003c46;
+  --topbar-shadow: 0 1px 0 rgba(0, 175, 175, 0.22);
+  --panel-grad: #003c46;
+
+  --map-backdrop: #003c46;
+  --map-veil: rgba(0, 60, 70, 0.92);
+  --chip-bg: #014852;
+  --chip-shadow: 0 8px 20px -12px rgba(0, 0, 0, 0.5);
+  --ctrl-bg: #014852;
+  --ctrl-hover: rgba(0, 175, 175, 0.18);
+  --attrib-bg: #003c46;
+  --attrib-text: #7a9a9a;
   --attrib-link: #00afaf;
-  --popup-bg: rgba(0, 60, 70, 0.97);
+  --popup-bg: #014852;
+  --popup-shadow: 0 12px 28px -14px rgba(0, 0, 0, 0.55);
 
-  --display-grad: linear-gradient(180deg, #ffffff 0%, #b8e8e8 130%);
+  --display-grad: none;
+  --grid-line: rgba(0, 175, 175, 0.06);
 
   /* Yellow only for warnings / sparse emphasis — not the main accent */
   --warn-bg: rgba(255, 255, 0, 0.12);
   --warn-border: rgba(255, 255, 0, 0.45);
   --warn-text: #ffff00;
 
-  background-color: var(--canvas);
-  background-image:
-    repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 72px),
-    repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 72px),
-    radial-gradient(1200px 680px at 8% -12%, rgba(0, 175, 175, 0.18), transparent 60%),
-    radial-gradient(900px 700px at 50% 120%, rgba(33, 35, 31, 0.55), transparent 60%),
-    linear-gradient(180deg, #003c46 0%, #012f37 55%, #21231f 100%);
+  background-color: #003c46;
+  background-image: none;
 }
 
 .mom-canvas[data-agency="dealer-media-house"][data-theme="light"] {
@@ -320,46 +331,69 @@ body {
   --ink-2: #2c302c;
   --muted: #4a524e;
   --faint: #6b756f;
-  --line: #d7e0e0;
-  --line-soft: #e8efef;
+  --line: #c9d9d9;
+  --line-soft: #e4eded;
   --surface: #ffffff;
-  --surface-2: #f4f8f8;
-  --canvas: #f7fbfb;
+  --surface-2: #f3f8f8;
+  --canvas: #ffffff;
 
   --card-grad-top: #ffffff;
-  --card-grad-bottom: #f9fcfc;
-  --inset-grad-top: #ffffff;
-  --inset-grad-bottom: #f3f8f8;
+  --card-grad-bottom: #ffffff;
+  --card-shadow: 0 1px 2px rgba(0, 60, 70, 0.06), 0 8px 24px -16px rgba(0, 60, 70, 0.18);
+  --inset-grad-top: #f7fbfb;
+  --inset-grad-bottom: #f7fbfb;
 
-  --track: #e2ecec;
+  --track: #dceaea;
   --seg-bg: #eaf3f3;
   --seg-active-bg: #ffffff;
+  --seg-active-shadow: 0 1px 2px rgba(0, 60, 70, 0.08);
 
-  --display-grad: linear-gradient(180deg, #003c46 0%, #21231f 145%);
+  --display-grad: none;
 
-  --topbar-grad: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 248, 248, 0.92));
-  --panel-grad: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(244, 248, 248, 0.98));
+  --topbar-grad: #ffffff;
+  --topbar-shadow: 0 1px 0 #c9d9d9;
+  --panel-grad: #ffffff;
 
-  --map-backdrop: #eef5f5;
-  --map-veil: rgba(238, 245, 245, 0.85);
-  --chip-bg: rgba(255, 255, 255, 0.96);
-  --ctrl-bg: rgba(255, 255, 255, 0.96);
+  --map-backdrop: #f3f8f8;
+  --map-veil: rgba(255, 255, 255, 0.92);
+  --chip-bg: #ffffff;
+  --ctrl-bg: #ffffff;
   --glyph-filter: none;
-  --attrib-bg: rgba(255, 255, 255, 0.88);
+  --attrib-bg: #ffffff;
   --attrib-text: #6b756f;
   --attrib-link: #003c46;
-  --popup-bg: rgba(255, 255, 255, 0.98);
+  --popup-bg: #ffffff;
 
   --warn-bg: #fffeeb;
   --warn-border: #e6e600;
   --warn-text: #5c5c00;
 
-  background-color: var(--canvas);
-  background-image:
-    repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 72px),
-    repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 72px),
-    radial-gradient(1200px 680px at 8% -12%, rgba(0, 175, 175, 0.1), transparent 60%),
-    linear-gradient(180deg, #ffffff 0%, #f4f8f8 60%, #eef5f5 100%);
+  background-color: #ffffff;
+  background-image: none;
+}
+
+/* Kill glass wash so brand hexes aren't re-tinted through blur/saturate. */
+.mom-canvas[data-agency="dealer-media-house"] .mom-card,
+.mom-canvas[data-agency="dealer-media-house"] .mom-topbar,
+.mom-canvas[data-agency="dealer-media-house"] .mom-panel,
+.mom-canvas[data-agency="dealer-media-house"] .mom-chip,
+.mom-canvas[data-agency="dealer-media-house"] .mom-map-ctrl,
+.mom-canvas[data-agency="dealer-media-house"] .mom-nav-btn,
+.mom-canvas[data-agency="dealer-media-house"] .mom-icon-btn,
+.mom-canvas[data-agency="dealer-media-house"] .maplibregl-popup.mom-popup .maplibregl-popup-content {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.mom-canvas[data-agency="dealer-media-house"] .mom-display {
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  color: var(--ink);
+}
+
+.mom-canvas[data-agency="dealer-media-house"] .mom-display-accent {
+  text-shadow: none;
 }
 
 .mom-canvas[data-agency="dealer-media-house"] .mom-eyebrow,
