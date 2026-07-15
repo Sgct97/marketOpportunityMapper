@@ -204,7 +204,6 @@ export function Donut({
               strokeDashoffset={-arc.offset}
               transform={`rotate(-90 ${cx} ${cx})`}
               strokeLinecap="butt"
-              style={i === 0 ? { filter: `drop-shadow(0 0 6px ${tint(accent, 0.5)})` } : undefined}
             />
           ))}
         </svg>
