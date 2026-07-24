@@ -1,17 +1,14 @@
 import type { DashboardModel } from '@/lib/audience/dashboard';
 import { TOP_SEGMENT_DISPLAY_COUNT, TOP_ZIP_DISPLAY_COUNT } from '@/lib/audience/presentation-limits';
 import type { ReachScopeCopy } from '@/lib/audience/presentation-scope';
-import { formatZipDisplay, formatZipDisplayTitle } from '@/lib/map/zip-labels';
+import { formatZipDisplay } from '@/lib/map/zip-labels';
 import type { ZipLabel } from '@/lib/map/zip-labels';
 import { formatCompact, formatNumber, formatPercent, EMPTY_VALUE } from '@/lib/format';
 import {
   BarRow,
-  Chip,
   Donut,
-  IconFlag,
   IconLayers,
   IconTarget,
-  IconUsers,
   KpiCard,
   SectionCard,
 } from './primitives';
@@ -26,8 +23,38 @@ interface Props {
   focusName: string | null;
   radiusMiles: number;
   reachScope: ReachScopeCopy;
-  competitorsInScope: boolean;
   excludedZipCount: number;
+  /** When false, hide Audience composition donuts (also omitted from PDF). */
+  showComposition: boolean;
+  onShowCompositionChange: (show: boolean) => void;
+  /** Live map canvas snapshot — mirrors the Map tab's current pan/zoom. */
+  mapPreviewUrl?: string | null;
+  onOpenMap?: () => void;
+}
+
+function CompositionSwitch({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="inline-flex items-center gap-2.5 cursor-pointer select-none">
+      <span className="text-[12px] text-[var(--muted)]">Composition</span>
+      <span className="relative inline-flex h-5 w-9 shrink-0 items-center">
+        <input
+          type="checkbox"
+          className="peer sr-only"
+          checked={checked}
+          onChange={e => onChange(e.target.checked)}
+          aria-label="Show audience composition charts"
+        />
+        <span className="absolute inset-0 rounded-full bg-[var(--line)] transition-colors peer-checked:bg-[var(--accent)]" />
+        <span className="absolute left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
+      </span>
+    </label>
+  );
 }
 
 export function DashboardView({
@@ -39,8 +66,11 @@ export function DashboardView({
   focusName,
   radiusMiles,
   reachScope,
-  competitorsInScope,
   excludedZipCount,
+  showComposition,
+  onShowCompositionChange,
+  mapPreviewUrl = null,
+  onOpenMap,
 }: Props) {
   const {
     totalAudience,
@@ -51,7 +81,6 @@ export function DashboardView({
     composition,
     concentration,
     tradeArea,
-    competitive,
   } = model;
 
   const useTradeArea = Boolean(
@@ -92,15 +121,19 @@ export function DashboardView({
           </section>
         ) : (
         <>
-        {/* Hero */}
-        <section className="mom-card mom-card-lg mom-fade-up relative overflow-hidden p-7 sm:p-9">
+        {/* Hero — copy left; live map snapshot (current pan/zoom) on the right. */}
+        <section className="mom-card mom-card-lg mom-fade-up relative overflow-hidden">
+          {!mapPreviewUrl && (
+            <div
+              className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full blur-3xl"
+              style={{ background: 'var(--accent-soft)' }}
+              aria-hidden
+            />
+          )}
           <div
-            className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full blur-3xl"
-            style={{ background: 'var(--accent-soft)' }}
-            aria-hidden
-          />
-          <div className="relative flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-2xl">
+            className={`relative grid ${mapPreviewUrl ? 'lg:grid-cols-2' : ''}`}
+          >
+            <div className="p-7 sm:p-9 min-w-0">
               <div className="flex items-center gap-2.5">
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--accent)', boxShadow: '0 0 10px var(--accent)' }} />
                 <p className="mom-eyebrow">Market opportunity · {subjectName}</p>
@@ -146,39 +179,47 @@ export function DashboardView({
                 concentrated in the top 5 ZIPs · {formatNumber(conc.zipsForHalf)} ZIPs make up half the reach.
               </p>
             </div>
-            <div className="shrink-0 lg:text-right">
-              <span
-                className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold"
-                style={{
-                  background: 'var(--accent-soft)',
-                  color: 'var(--accent)',
-                  border: '1px solid var(--accent-line)',
-                }}
+
+            {mapPreviewUrl && (
+              <button
+                type="button"
+                onClick={onOpenMap}
+                className="relative min-h-[220px] lg:min-h-0 border-t lg:border-t-0 lg:border-l border-[var(--line-soft)] text-left group cursor-pointer"
+                style={{ background: 'var(--map-backdrop)' }}
+                aria-label="Open map view"
               >
-                <span className="h-2 w-2 rounded-full" style={{ background: 'var(--accent)' }} />
-                {brandName}
-              </span>
-            </div>
+                {/* `contain`, not `cover`: cover scales the snapshot up and
+                    crops it, which reads as a different zoom than the map. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={mapPreviewUrl}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-contain"
+                />
+                <span
+                  className="absolute bottom-3 right-3 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold tracking-wide uppercase opacity-90 transition-opacity group-hover:opacity-100"
+                  style={{
+                    background: 'var(--chip-bg)',
+                    color: 'var(--ink)',
+                    border: '1px solid var(--line)',
+                  }}
+                >
+                  Open map
+                </span>
+              </button>
+            )}
           </div>
         </section>
 
         {/* KPI row */}
-        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
-          <KpiCard
-            label="Largest single audience"
-            value={leadSegment ? formatCompact(leadSegment.total) : EMPTY_VALUE}
-            accent={leadSegment ? formatPercent(leadSegment.share) : null}
-            icon={<IconUsers />}
-            sub={leadSegment?.name ?? 'No segments in file'}
-            delay={40}
-          />
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
           {useTradeArea ? (
             <KpiCard
               label="ZIPs in trade area"
               value={formatNumber(heroZips)}
               icon={<IconTarget />}
               sub={`within ${radiusMiles} mi of ${subjectName}`}
-              delay={100}
+              delay={40}
             />
           ) : (
             <KpiCard
@@ -186,7 +227,7 @@ export function DashboardView({
               value={topSegment ? formatPercent(topSegment.share) : EMPTY_VALUE}
               icon={<IconTarget />}
               sub={topSegment?.name ?? 'No segments'}
-              delay={100}
+              delay={40}
             />
           )}
           <KpiCard
@@ -194,42 +235,47 @@ export function DashboardView({
             value={formatPercent(conc.top5Share)}
             icon={<IconLayers />}
             sub={`from the top 5 ZIPs · ${formatNumber(conc.zipsForHalf)} ZIPs make up half`}
-            delay={160}
+            delay={100}
           />
-          {competitive.competitorCount > 0 ? (
-            <KpiCard
-              label="Competitive field"
-              value={formatNumber(competitive.competitorCount)}
-              icon={<IconFlag />}
-              sub={`rival stores · ${formatNumber(competitive.whiteSpace.length)} white-space ZIPs`}
-              delay={220}
-            />
-          ) : (
-            <KpiCard
-              label="Segments in file"
-              value={formatNumber(segmentCount)}
-              icon={<IconFlag />}
-              sub="distinct audience segments"
-              delay={220}
-            />
-          )}
         </div>
 
         {/* Composition */}
         {hasComposition && (
           <div className="mt-5">
-            <SectionCard eyebrow="Grouped from segment names" title="Audience composition">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-7 md:gap-10">
-                {compositionFacets.map(facet => (
-                  <Donut
-                    key={facet.id}
-                    title={facet.buckets[0]?.label ?? ''}
-                    buckets={facet.buckets}
-                    accent={glow}
+            {showComposition ? (
+              <SectionCard
+                eyebrow="Grouped from segment names"
+                title="Audience composition"
+                right={
+                  <CompositionSwitch
+                    checked={showComposition}
+                    onChange={onShowCompositionChange}
                   />
-                ))}
+                }
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-7 md:gap-10">
+                  {compositionFacets.map(facet => (
+                    <Donut
+                      key={facet.id}
+                      title={facet.buckets[0]?.label ?? ''}
+                      buckets={facet.buckets}
+                      accent={glow}
+                    />
+                  ))}
+                </div>
+              </SectionCard>
+            ) : (
+              <div className="mom-card flex items-center justify-between gap-4 px-5 py-3.5">
+                <div>
+                  <p className="mom-eyebrow">Grouped from segment names</p>
+                  <p className="mt-0.5 text-[13px] text-[var(--muted)]">Audience composition hidden</p>
+                </div>
+                <CompositionSwitch
+                  checked={showComposition}
+                  onChange={onShowCompositionChange}
+                />
               </div>
-            </SectionCard>
+            )}
           </div>
         )}
 
@@ -282,92 +328,21 @@ export function DashboardView({
                 </p>
               }
             >
-              <div className="space-y-1">
+              <div className="divide-y divide-[var(--line-soft)]">
                 {topZips.map((z, i) => (
-                  <div key={z.zip} className="flex items-center gap-3 py-2">
-                    <span
-                      className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[11px] tnum font-bold"
-                      style={
-                        i === 0
-                          ? { background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-line)' }
-                          : { color: 'var(--faint)' }
-                      }
-                    >
-                      {i + 1}
-                    </span>
-                    <span className="min-w-0 flex-1 text-[13.5px] font-medium text-[var(--ink-2)] truncate" title={formatZipDisplayTitle(z.zip, zipLabels)}>
-                      {formatZipDisplay(z.zip, zipLabels)}
-                    </span>
-                    <div className="mom-bar-track flex-1">
-                      <div
-                        className="mom-bar-fill"
-                        style={{ width: `${Math.max(4, (z.count / topZipMax) * 100)}%` }}
-                      />
-                    </div>
-                    <span className="w-20 text-right text-[13px] tnum font-semibold text-[var(--ink)]">
-                      {formatNumber(z.count)}
-                    </span>
-                  </div>
+                  <BarRow
+                    key={z.zip}
+                    rank={i + 1}
+                    name={formatZipDisplay(z.zip, zipLabels)}
+                    value={formatNumber(z.count)}
+                    share={z.share}
+                    ratio={z.count / topZipMax}
+                  />
                 ))}
                 {topZips.length === 0 && (
                   <p className="py-3 text-[13px] text-[var(--muted)]">No ZIP data available.</p>
                 )}
               </div>
-            </SectionCard>
-
-            <SectionCard eyebrow="Competitive context" title="Field & white space">
-              {competitive.competitorCount > 0 ? (
-                <div className="space-y-5">
-                  <div className="flex items-baseline gap-2.5">
-                    <span className="mom-display text-[30px] font-semibold">
-                      {formatNumber(competitive.competitorCount)}
-                    </span>
-                    <span className="text-[13px] text-[var(--muted)]">competitor stores in view</span>
-                  </div>
-                  {competitive.competitorBrands.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {competitive.competitorBrands.map(b => (
-                        <Chip key={b}>{b}</Chip>
-                      ))}
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-[12px] font-medium text-[var(--ink-2)] mb-1">White-space ZIPs</p>
-                    <p className="text-[11px] text-[var(--faint)] mb-3">
-                      High audience with no competitor within {radiusMiles} mi
-                    </p>
-                    {competitive.whiteSpace.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {competitive.whiteSpace.map(z => (
-                          <span
-                            key={z.zip}
-                            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12.5px] tnum font-medium"
-                            style={{
-                              border: '1px solid var(--accent-line)',
-                              color: 'var(--accent)',
-                              background: 'var(--accent-soft)',
-                            }}
-                            title={formatZipDisplayTitle(z.zip, zipLabels)}
-                          >
-                            {formatZipDisplay(z.zip, zipLabels)}
-                            <span className="text-[var(--muted)]">{formatNumber(z.count)}</span>
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-[13px] text-[var(--muted)]">
-                        Competitors cover the high-audience ZIPs in this trade area.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-[13px] leading-relaxed text-[var(--muted)]">
-                  {competitorsInScope
-                    ? 'No competitors saved yet. Add rival dealerships in setup to reveal white-space ZIPs and competitive coverage.'
-                    : 'Turn on the competitor layer in map controls to factor rivals into white-space analysis.'}
-                </p>
-              )}
             </SectionCard>
           </div>
         </div>
@@ -377,8 +352,7 @@ export function DashboardView({
           {datasetLabel ? `Source: ${datasetLabel}. ` : ''}
           Figures match the current map scope: {reachScope.segmentPhrase.toLowerCase()}
           {excludedZipCount > 0 ? `, ${excludedZipCount} excluded ZIP${excludedZipCount === 1 ? '' : 's'}` : ''}
-          {useTradeArea ? `, within ${radiusMiles} mi of ${subjectName}` : ''}
-          {!competitorsInScope && competitive.competitorCount > 0 ? ', competitors hidden on map' : ''}.
+          {useTradeArea ? `, within ${radiusMiles} mi of ${subjectName}` : ''}.
           {' '}
           “Reach” is the sum of segment counts; the same person can belong to more than one
           segment, so reach reflects total addressable touchpoints, not unique individuals.

@@ -14,6 +14,11 @@ interface Props {
   backLabel?: string;
   /** Optional right-aligned note (e.g. "Auth off"). */
   note?: ReactNode;
+  /**
+   * Agency id for brand skin (fonts/colors). Defaults to Dealer Media House so
+   * setup/home match the default letterhead; pass project.brand_id when known.
+   */
+  agencyId?: string;
   children: ReactNode;
 }
 
@@ -50,7 +55,14 @@ function MoonIcon() {
  * surface, glass topbar, and a dark/light toggle that shares the same
  * `localStorage` key as the presentation so the theme is consistent app-wide.
  */
-export function PageChrome({ title, backHref, backLabel, note, children }: Props) {
+export function PageChrome({
+  title,
+  backHref,
+  backLabel,
+  note,
+  agencyId = 'dealer-media-house',
+  children,
+}: Props) {
   // Default to dark on server + first client render to avoid hydration
   // mismatch; the saved preference is applied after mount.
   const [theme, setTheme] = useState<Theme>('dark');
@@ -69,7 +81,7 @@ export function PageChrome({ title, backHref, backLabel, note, children }: Props
   }, []);
 
   return (
-    <div className="mom-canvas min-h-screen" data-theme={theme}>
+    <div className="mom-canvas min-h-screen" data-theme={theme} data-agency={agencyId}>
       <header className="mom-topbar relative z-20 flex items-center justify-between gap-4 border-b border-[var(--line)] px-4 sm:px-6 h-16">
         <div className="flex items-center gap-3 min-w-0">
           {backHref && (

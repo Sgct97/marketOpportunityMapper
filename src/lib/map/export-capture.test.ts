@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boundsFromRadius } from './export-capture';
+import { boundsFromRadius, captureMapPreview } from './export-capture';
 import { distanceMiles } from './radius';
 
 describe('boundsFromRadius', () => {
@@ -25,5 +25,11 @@ describe('boundsFromRadius', () => {
     const smallSpan = small.ne[0] - small.sw[0];
     const largeSpan = large.ne[0] - large.sw[0];
     expect(largeSpan).toBeGreaterThan(smallSpan * 4);
+  });
+});
+
+describe('captureMapPreview', () => {
+  it('returns null when no map is available', () => {
+    expect(captureMapPreview(null)).toBeNull();
   });
 });

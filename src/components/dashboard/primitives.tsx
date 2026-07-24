@@ -74,7 +74,7 @@ export function KpiCard({
         {icon && <span className="mom-tile h-8 w-8">{icon}</span>}
       </div>
       <div className="mt-4 flex items-baseline gap-2.5">
-        <span className="mom-display text-[40px] sm:text-[46px] font-semibold">{value}</span>
+        <span className="mom-display text-[40px] sm:text-[46px] font-semibold tnum">{value}</span>
         {accent && (
           <span className="mom-display-accent text-[15px] font-bold tnum">{accent}</span>
         )}
@@ -204,16 +204,17 @@ export function Donut({
               strokeDashoffset={-arc.offset}
               transform={`rotate(-90 ${cx} ${cx})`}
               strokeLinecap="butt"
-              style={i === 0 ? { filter: `drop-shadow(0 0 6px ${tint(accent, 0.5)})` } : undefined}
             />
           ))}
         </svg>
-        <div className="absolute inset-0 grid place-items-center text-center">
-          <div>
-            <p className="mom-stat text-[24px] font-semibold leading-none">
+        <div className="absolute inset-0 grid place-items-center text-center px-5">
+          <div className="min-w-0 max-w-full">
+            <p className="mom-stat text-[22px] font-semibold leading-none">
               {top ? formatPercent(top.share) : EMPTY_VALUE}
             </p>
-            <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-[var(--faint)]">
+            {/* Cap width so long titles (e.g. "General Market") wrap inside the
+                hole — available chord width is narrower below the center. */}
+            <p className="mt-0.5 mx-auto max-w-[4.5rem] text-[9px] uppercase tracking-[0.04em] leading-snug text-[var(--faint)]">
               {title}
             </p>
           </div>

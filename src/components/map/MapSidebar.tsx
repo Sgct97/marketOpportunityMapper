@@ -452,7 +452,7 @@ export function MapSidebar({
         <div className="mt-4 flex gap-4 text-[11px] text-[var(--muted)]">
           <span className="flex items-center gap-1.5">
             <span
-              className="text-[13px] leading-none drop-shadow-sm"
+              className="text-[13px] leading-none"
               style={{ color: 'var(--accent)' }}
               aria-hidden
             >

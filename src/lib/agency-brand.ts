@@ -17,6 +17,10 @@ export interface AgencyBrandConfig {
   secondaryColor: string;
   textColor: string;
   headerBackgroundColor?: string;
+  /** Optional brand highlight (e.g. DMH yellow) — sparingly for emphasis. */
+  highlightColor?: string;
+  /** Optional deep tertiary (e.g. DMH charcoal). */
+  tertiaryColor?: string;
 }
 
 export const agencyBrands: Record<string, AgencyBrandConfig> = {
@@ -26,10 +30,14 @@ export const agencyBrands: Record<string, AgencyBrandConfig> = {
     logo: '/logo.png',
     logoAspect: 746 / 208,
     logoFormat: 'PNG',
-    primaryColor: '#4BA5A5',
-    glow: '#2DE0C8',
-    secondaryColor: '#5A5A5A',
-    textColor: '#333333',
+    // Brittany brand system (apply everywhere when this agency is selected).
+    primaryColor: '#003c46',
+    glow: '#00afaf',
+    secondaryColor: '#00afaf',
+    textColor: '#21231f',
+    /** Yellow highlight — use sparingly (alerts / emphasis), never as the main accent. */
+    highlightColor: '#ffff00',
+    tertiaryColor: '#21231f',
   },
   'dealers-direct-us': {
     id: 'dealers-direct-us',

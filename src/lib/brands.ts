@@ -54,7 +54,7 @@ interface OemAccent {
 export const defaultBrand: BrandConfig = buildBrand(
   'dealer-media-house',
   'Dealer Media House',
-  { primary: '#0F8C8C', glow: '#2DE0C8' }
+  { primary: '#003C46', glow: '#00AFAF' }
 );
 
 /**

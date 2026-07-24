@@ -35,7 +35,7 @@ export default async function ProjectMapPage({ params }: Props) {
           </p>
           <Link
             href={`/projects/${id}`}
-            className="inline-block mt-6 text-sm font-medium text-[#4BA5A5] hover:underline"
+            className="inline-block mt-6 text-sm font-medium text-[var(--accent,#003c46)] hover:underline"
           >
             ← Back to project setup
           </Link>

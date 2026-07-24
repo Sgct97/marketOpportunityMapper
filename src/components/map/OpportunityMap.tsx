@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import type { FeatureCollection, Geometry } from 'geojson';
 import { aggregateAudienceByZip } from '@/lib/audience/aggregate';
@@ -16,6 +16,7 @@ import { resolveBasemapStyles, type MapTheme } from '@/lib/map/basemap';
 import { choroplethFillPaint, choroplethLinePaint } from '@/lib/map/choropleth';
 import { hexToRgb } from '@/lib/map/colors';
 import { fetchZipBoundaries } from '@/lib/map/boundaries';
+import { boundsFromRadius } from '@/lib/map/export-capture';
 import {
   CLIENT_DEALERSHIP_HALO_LAYER,
   CLIENT_DEALERSHIP_LAYER,
@@ -221,6 +222,11 @@ export function OpportunityMap({
   const clickBoundRef = useRef(false);
   const dealerBoundRef = useRef(false);
   const hoveredFeatureIdRef = useRef<string | number | null>(null);
+  const popupHoveredRef = useRef(false);
+  const hidePopupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const switchZipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dockZipRef = useRef<string | null>(null);
+  const pendingZipRef = useRef<string | null>(null);
   const onFocusRef = useRef(onFocusDealership);
   const focusIdRef = useRef(focusDealershipId);
   const onMapReadyRef = useRef(onMapReady);
@@ -231,6 +237,17 @@ export function OpportunityMap({
   const rowsRef = useRef(rows);
 
   const themeRef = useRef(theme);
+  const activeRef = useRef(active);
+  // Last camera seen while the pane was visible. Hiding it collapses the
+  // container to 0x0, and MapLibre re-constrains the camera against that empty
+  // viewport — which is what reset the zoom/center on the way back.
+  const lastCameraRef = useRef<{
+    center: [number, number];
+    zoom: number;
+    bearing: number;
+    pitch: number;
+  } | null>(null);
+  const wasHiddenRef = useRef(false);
 
   useEffect(() => {
     onFocusRef.current = onFocusDealership;
@@ -243,11 +260,18 @@ export function OpportunityMap({
     themeRef.current = theme;
   }, [onFocusDealership, focusDealershipId, onMapReady, onToggleZipExcluded, excludedZips, zipLabels, rows, theme]);
 
+  // Kept in a layout effect so the flag flips before the browser reports the
+  // collapsed container size, otherwise we'd record the corrupted camera.
+  useLayoutEffect(() => {
+    activeRef.current = active;
+  }, [active]);
+
   const [layersReady, setLayersReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [boundaryLoading, setBoundaryLoading] = useState(false);
   const [boundaryError, setBoundaryError] = useState<string | null>(null);
   const [featureCount, setFeatureCount] = useState(0);
+  const [zipDockHtml, setZipDockHtml] = useState<string | null>(null);
   const boundaryDataRef = useRef<FeatureCollection<Geometry> | null>(null);
 
   const aggregate = useMemo(
@@ -369,53 +393,140 @@ export function OpportunityMap({
     }
   }, []);
 
+  const buildZipDockHtml = useCallback(
+    (zip: string, excluded: boolean, count: number, typeLabelForZip: string) => {
+      const segments = segmentMetricsForZip(rowsRef.current, zip);
+      const totalCount = segments.reduce((sum, seg) => sum + seg.count, 0);
+      return audiencePopupHtml({
+        zip,
+        typeLabel: typeLabelForZip,
+        count: totalCount > 0 ? totalCount : count,
+        accentColor: primaryColor,
+        segments,
+        excluded,
+        theme: themeRef.current,
+        zipLabels: zipLabelsRef.current,
+      });
+    },
+    [primaryColor]
+  );
+
+  const showZipDock = useCallback(
+    (zip: string, excluded: boolean, count: number, typeLabelForZip: string) => {
+      dockZipRef.current = zip;
+      pendingZipRef.current = zip;
+      setZipDockHtml(buildZipDockHtml(zip, excluded, count, typeLabelForZip));
+    },
+    [buildZipDockHtml]
+  );
+
+  const clearZipDock = useCallback(() => {
+    dockZipRef.current = null;
+    pendingZipRef.current = null;
+    setZipDockHtml(null);
+  }, []);
+
+  // Keep the open card in sync when include/exclude flips for that ZIP.
+  useEffect(() => {
+    const zip = dockZipRef.current;
+    if (!zip) return;
+    const excluded = excludedZips.includes(zip);
+    const count = aggregate.byZip[zip] ?? 0;
+    setZipDockHtml(buildZipDockHtml(zip, excluded, count, typeLabel));
+  }, [excludedZips, aggregate.byZip, typeLabel, buildZipDockHtml, theme, zipLabels]);
+
   const bindHoverHandlers = useCallback(
     (map: maplibregl.Map) => {
       if (hoverBoundRef.current) return;
       hoverBoundRef.current = true;
+
+      const ZIP_SWITCH_PAUSE_MS = 350;
+      const ZIP_HIDE_GRACE_MS = 400;
+
+      const cancelHideTimer = () => {
+        if (hidePopupTimerRef.current != null) {
+          clearTimeout(hidePopupTimerRef.current);
+          hidePopupTimerRef.current = null;
+        }
+      };
+
+      const cancelSwitchTimer = () => {
+        if (switchZipTimerRef.current != null) {
+          clearTimeout(switchZipTimerRef.current);
+          switchZipTimerRef.current = null;
+        }
+      };
+
+      const scheduleHideDock = () => {
+        cancelHideTimer();
+        hidePopupTimerRef.current = setTimeout(() => {
+          if (popupHoveredRef.current) return;
+          clearZipDock();
+          map.getCanvas().style.cursor = '';
+          clearHoverState(map);
+        }, ZIP_HIDE_GRACE_MS);
+      };
 
       map.on('mousemove', 'zip-fill', e => {
         if (!e.features?.[0]) return;
         const feature = e.features[0];
         const props = feature.properties || {};
         const zip = String(props.ZCTA5 || props.GEOID || props.BASENAME || '');
+        if (!zip) return;
+
         const count = Number(props.audienceCount ?? 0);
         const excluded = Boolean(props.excluded);
-        const segments = segmentMetricsForZip(rowsRef.current, zip);
-        const totalCount = segments.reduce((sum, seg) => sum + seg.count, 0);
+        const typeLabelForZip = String(props.audienceTypeLabel || typeLabel);
         const featureId = feature.id;
+        const featureChanged =
+          featureId != null && hoveredFeatureIdRef.current !== featureId;
 
-        if (featureId != null && hoveredFeatureIdRef.current !== featureId) {
+        cancelHideTimer();
+
+        if (featureChanged) {
           clearHoverState(map);
           hoveredFeatureIdRef.current = featureId;
           map.setFeatureState({ source: 'zip-areas', id: featureId }, { hover: true });
         }
 
         map.getCanvas().style.cursor = 'pointer';
-        popupRef.current
-          ?.setLngLat(e.lngLat)
-          .setHTML(
-            audiencePopupHtml({
-              zip,
-              typeLabel: String(props.audienceTypeLabel || typeLabel),
-              count: totalCount > 0 ? totalCount : count,
-              accentColor: primaryColor,
-              segments,
-              excluded,
-              theme: themeRef.current,
-              zipLabels: zipLabelsRef.current,
-            })
-          )
-          .addTo(map);
+
+        // Sticky card: show immediately if empty; otherwise require a brief pause on the new ZIP.
+        if (dockZipRef.current === zip) {
+          cancelSwitchTimer();
+          pendingZipRef.current = zip;
+          return;
+        }
+
+        if (!dockZipRef.current) {
+          cancelSwitchTimer();
+          showZipDock(zip, excluded, count, typeLabelForZip);
+          return;
+        }
+
+        if (pendingZipRef.current === zip && switchZipTimerRef.current != null) {
+          // Already waiting on this ZIP — keep the pause timer.
+          return;
+        }
+
+        cancelSwitchTimer();
+        pendingZipRef.current = zip;
+        switchZipTimerRef.current = setTimeout(() => {
+          switchZipTimerRef.current = null;
+          if (pendingZipRef.current !== zip) return;
+          showZipDock(zip, excluded, count, typeLabelForZip);
+        }, ZIP_SWITCH_PAUSE_MS);
       });
 
       map.on('mouseleave', 'zip-fill', () => {
+        cancelSwitchTimer();
+        pendingZipRef.current = dockZipRef.current;
         map.getCanvas().style.cursor = '';
-        popupRef.current?.remove();
         clearHoverState(map);
+        if (!popupHoveredRef.current) scheduleHideDock();
       });
     },
-    [typeLabel, primaryColor, clearHoverState]
+    [typeLabel, clearHoverState, clearZipDock, showZipDock]
   );
 
   const bindZipClickHandler = useCallback((map: maplibregl.Map) => {
@@ -523,7 +634,7 @@ export function OpportunityMap({
         closeOnClick: false,
         className: 'mom-popup',
         offset: 12,
-        maxWidth: '420px',
+        maxWidth: '260px',
       });
 
       const onStyleReady = () => initLayers(map);
@@ -558,6 +669,18 @@ export function OpportunityMap({
       clickBoundRef.current = false;
       dealerBoundRef.current = false;
       hoveredFeatureIdRef.current = null;
+      popupHoveredRef.current = false;
+      dockZipRef.current = null;
+      pendingZipRef.current = null;
+      if (hidePopupTimerRef.current != null) {
+        clearTimeout(hidePopupTimerRef.current);
+        hidePopupTimerRef.current = null;
+      }
+      if (switchZipTimerRef.current != null) {
+        clearTimeout(switchZipTimerRef.current);
+        switchZipTimerRef.current = null;
+      }
+      setZipDockHtml(null);
       onMapReadyRef.current?.(null);
       popupRef.current?.remove();
       popupRef.current = null;
@@ -601,11 +724,50 @@ export function OpportunityMap({
     theme,
   ]);
 
+  // Remember the camera whenever it settles while visible.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !layersReady || !active) return;
+    if (!map || !layersReady) return;
+
+    const remember = () => {
+      if (!activeRef.current) return;
+      const { lng, lat } = map.getCenter();
+      const zoom = map.getZoom();
+      if (!Number.isFinite(lng) || !Number.isFinite(lat) || !Number.isFinite(zoom)) return;
+      lastCameraRef.current = {
+        center: [lng, lat],
+        zoom,
+        bearing: map.getBearing(),
+        pitch: map.getPitch(),
+      };
+    };
+
+    // Only record settled cameras. Seeding this on mount would capture the
+    // constructor's world view and then restore it over the initial radius fit.
+    map.on('moveend', remember);
+    return () => {
+      map.off('moveend', remember);
+    };
+  }, [layersReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !layersReady) return;
+
+    if (!active) {
+      wasHiddenRef.current = true;
+      return;
+    }
+
     // Container had zero size while hidden (dashboard view); recompute on show.
-    const raf = requestAnimationFrame(() => map.resize());
+    // Only restore after an actual hide — on first open there is nothing to
+    // restore and a jumpTo here would clobber the initial radius fit.
+    const raf = requestAnimationFrame(() => {
+      map.resize();
+      const camera = lastCameraRef.current;
+      if (wasHiddenRef.current && camera) map.jumpTo(camera);
+      wasHiddenRef.current = false;
+    });
     return () => cancelAnimationFrame(raf);
   }, [active, layersReady]);
 
@@ -616,12 +778,11 @@ export function OpportunityMap({
     const focus = dealerships.find(d => d.id === focusDealershipId);
     if (!focus || focus.latitude == null || focus.longitude == null) return;
 
-    map.flyTo({
-      center: [focus.longitude, focus.latitude],
-      zoom: Math.max(map.getZoom(), 10),
-      duration: 800,
-    });
-  }, [layersReady, focusDealershipId, dealerships]);
+    // Frame the whole radius ring. A fixed zoom cropped it at larger radii, so
+    // the ring sat off-screen on load. Same bounds the PDF capture uses.
+    const { sw, ne } = boundsFromRadius(focus.longitude, focus.latitude, radiusMiles);
+    map.fitBounds([sw, ne], { padding: 56, duration: 800 });
+  }, [layersReady, focusDealershipId, dealerships, radiusMiles]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -730,6 +891,37 @@ export function OpportunityMap({
         </div>
       )}
 
+      {zipDockHtml && (
+        <div
+          className="mom-zip-hover-dock"
+          onMouseEnter={() => {
+            popupHoveredRef.current = true;
+            if (hidePopupTimerRef.current != null) {
+              clearTimeout(hidePopupTimerRef.current);
+              hidePopupTimerRef.current = null;
+            }
+          }}
+          onMouseLeave={() => {
+            popupHoveredRef.current = false;
+            hidePopupTimerRef.current = setTimeout(() => {
+              if (popupHoveredRef.current) return;
+              dockZipRef.current = null;
+              pendingZipRef.current = null;
+              setZipDockHtml(null);
+              const map = mapRef.current;
+              if (map) {
+                map.getCanvas().style.cursor = '';
+                clearHoverState(map);
+              }
+            }, 400);
+          }}
+          onWheel={event => {
+            event.stopPropagation();
+          }}
+          dangerouslySetInnerHTML={{ __html: zipDockHtml }}
+        />
+      )}
+
       {layersReady && showCompetitorLayer && rankedCompetitors.length > 0 && (
         <CompetitorLegend
           competitors={rankedCompetitors}
@@ -754,7 +946,7 @@ export function OpportunityMap({
 
       {isEmptySelection && selectedTypes.length === 0 && (
         <div
-          className="absolute inset-0 z-10 flex items-center justify-center backdrop-blur-[2px] pointer-events-none"
+          className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none"
           style={{ background: 'var(--map-veil)' }}
         >
           <p className="text-sm text-[var(--muted)]">Select at least one audience segment</p>

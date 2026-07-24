@@ -1,6 +1,32 @@
 @import "tailwindcss";
 @import "maplibre-gl/dist/maplibre-gl.css";
 
+/* Brand UI font — Questa Sans (Bold = headings, Regular = body).
+   Brittany brief listed two fonts; only this family was supplied.
+   IMPORTANT: Tailwind uses 500 (medium) and 600 (semibold). Those MUST map
+   onto the Bold file or the browser silently falls back to system-ui. */
+@font-face {
+  font-family: "Questa Sans";
+  src:
+    url("/fonts/questa-sans-regular.woff2") format("woff2"),
+    url("/fonts/questa-sans-regular.ttf") format("truetype"),
+    url("/fonts/questa-sans-regular.otf") format("opentype");
+  font-weight: 100 499;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Questa Sans";
+  src:
+    url("/fonts/questa-sans-bold.woff2") format("woff2"),
+    url("/fonts/questa-sans-bold.ttf") format("truetype"),
+    url("/fonts/questa-sans-bold.otf") format("opentype");
+  font-weight: 500 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
    Market Opportunity Mapper — "Command Center" presentation design system.
 
@@ -16,30 +42,30 @@
   --foreground: #0b1220;
 
   /* Light defaults (used by setup/auth screens, not the presentation) */
-  --ink: #0b1220;
-  --ink-2: #1e2a3b;
-  --muted: #5b6b82;
-  --faint: #8a98ad;
-  --line: #e6eaf1;
-  --line-soft: #eef1f7;
+  --ink: #21231f;
+  --ink-2: #2c302c;
+  --muted: #4a524e;
+  --faint: #6b756f;
+  --line: #d7e0e0;
+  --line-soft: #e8efef;
   --surface: #ffffff;
-  --surface-2: #f8fafc;
-  --canvas: #f5f7fb;
+  --surface-2: #f4f8f8;
+  --canvas: #f7fbfb;
 
-  --accent: #0f8c8c;
-  --accent-strong: #0f8c8c;
-  --accent-deep: #0a6a6a;
-  --accent-dark: #0a6a6a;
-  --accent-soft: rgba(15, 140, 140, 0.12);
-  --accent-line: rgba(15, 140, 140, 0.4);
+  --accent: #003c46;
+  --accent-strong: #003c46;
+  --accent-deep: #002a31;
+  --accent-dark: #002a31;
+  --accent-soft: rgba(0, 60, 70, 0.12);
+  --accent-line: rgba(0, 60, 70, 0.4);
   --on-accent: #ffffff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: "Questa Sans", system-ui, sans-serif;
+  --font-mono: "Questa Sans", system-ui, sans-serif;
 }
 
 html {
@@ -49,8 +75,10 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
+  font-family: "Questa Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-variant-numeric: lining-nums tabular-nums;
+  font-feature-settings: "lnum" 1, "tnum" 1;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -60,6 +88,9 @@ body {
    ────────────────────────────────────────────────────────────────────────── */
 .mom-canvas {
   color-scheme: dark;
+  font-family: "Questa Sans", system-ui, sans-serif !important;
+  font-variant-numeric: lining-nums tabular-nums;
+  font-feature-settings: "lnum" 1, "tnum" 1;
 
   --ink: #f4f7fe;
   --ink-2: #c5d0e3;
@@ -229,8 +260,262 @@ body {
     linear-gradient(180deg, #f4f7fc 0%, #eaeff7 60%, #e6ecf5 100%);
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Dealer Media House agency skin — visual only (colors + fonts).
+   Scoped to data-agency="dealer-media-house" only. Vehicle OEM accents still
+   flow through --brand-* when the Vehicle accent toggle is selected; this
+   block only fixes DMH chrome + default agency tokens (no OEM table changes).
+
+   Roles (Brittany brief):
+   - Primary #003c46 — dark field / light headers & primary buttons
+   - Secondary #00afaf — interactive accent on dark; links & secondary on light
+   - Tertiary #21231f — charcoal (light body text; dark deep inset)
+   - Text — #ffffff on dark, #21231f on light
+   - Accent #ffff00 — warnings / sparse emphasis only
+   ────────────────────────────────────────────────────────────────────────── */
+.mom-canvas[data-agency="dealer-media-house"] {
+  --font-heading: "Questa Sans", system-ui, sans-serif;
+  --font-body: "Questa Sans", system-ui, sans-serif;
+  --brand-highlight: #ffff00;
+
+  /* Defaults when no inline OEM/agency brandVars are injected (setup/home).
+     Soft/line for primary use primary rgba — not secondary teal wash. */
+  --brand-primary: #003c46;
+  --brand-primary-dark: #002a31;
+  --brand-primary-soft: rgba(0, 60, 70, 0.12);
+  --brand-primary-line: rgba(0, 60, 70, 0.4);
+  --brand-glow: #00afaf;
+  --brand-glow-deep: #008f8f;
+  --brand-glow-soft: rgba(0, 175, 175, 0.16);
+  --brand-glow-line: rgba(0, 175, 175, 0.45);
+  --brand-on: #ffffff;
+  --brand-secondary: var(--brand-glow, #00afaf);
+
+  font-family: var(--font-body);
+  font-weight: 400;
+  /* Questa Sans defaults to oldstyle figures (6 sits above 3). Force lining
+     digits everywhere in the DMH UI — KPIs, donuts, sidebars, body copy. */
+  font-variant-numeric: lining-nums tabular-nums;
+  font-feature-settings: "lnum" 1, "tnum" 1;
+
+  /* Dark: true primary field, white type, neutral (not teal-washed) chrome.
+     --accent stays mapped to --brand-glow so Vehicle OEM glows still apply. */
+  --ink: #ffffff;
+  --ink-2: #e6eeee;
+  --muted: #b0c4c4;
+  --faint: #8aa3a3;
+  --line: rgba(255, 255, 255, 0.14);
+  --line-soft: rgba(255, 255, 255, 0.08);
+  --surface: #0a4550;
+  --surface-2: #00343c;
+  --canvas: #003c46;
+
+  --card-grad-top: #0a4550;
+  --card-grad-bottom: #0a4550;
+  --card-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 24px -16px rgba(0, 0, 0, 0.55);
+  --inset-grad-top: #00343c;
+  --inset-grad-bottom: #00343c;
+
+  --track: rgba(255, 255, 255, 0.12);
+  --bar-glow: none;
+  --accent-text-glow: none;
+  --glyph-filter: none;
+  --map-veil: transparent;
+
+  --seg-bg: #00343c;
+  --seg-shadow: none;
+  --seg-active-bg: #0a4550;
+  --seg-active-shadow: none;
+
+  --topbar-grad: #003c46;
+  --topbar-shadow: 0 1px 0 rgba(255, 255, 255, 0.1);
+  --panel-grad: #003c46;
+
+  --map-backdrop: #003c46;
+  --chip-bg: #0a4550;
+  --chip-shadow: none;
+  --ctrl-bg: #0a4550;
+  --ctrl-hover: rgba(0, 175, 175, 0.18);
+  --attrib-bg: #003c46;
+  --attrib-text: #8aa3a3;
+  /* Links use secondary by default; Vehicle toggle overrides --brand-glow. */
+  --attrib-link: var(--brand-glow, #00afaf);
+  --popup-bg: #0a4550;
+  --popup-shadow: none;
+
+  --display-grad: none;
+  --grid-line: rgba(255, 255, 255, 0.04);
+
+  --warn-bg: rgba(255, 255, 0, 0.12);
+  --warn-border: rgba(255, 255, 0, 0.45);
+  --warn-text: #ffff00;
+
+  background-color: #003c46;
+  background-image: none;
+}
+
+.mom-canvas[data-agency="dealer-media-house"][data-theme="light"] {
+  --ink: #21231f;
+  --ink-2: #2c302c;
+  --muted: #4a524e;
+  --faint: #6b756f;
+  --line: #d5dddd;
+  --line-soft: #e8eeee;
+  --surface: #ffffff;
+  --surface-2: #f5f7f7;
+  --canvas: #ffffff;
+
+  --card-grad-top: #ffffff;
+  --card-grad-bottom: #ffffff;
+  --card-shadow: 0 1px 2px rgba(33, 35, 31, 0.05), 0 8px 24px -16px rgba(0, 60, 70, 0.14);
+  --inset-grad-top: #f5f7f7;
+  --inset-grad-bottom: #f5f7f7;
+
+  --track: #e4eaea;
+  --seg-bg: #eef2f2;
+  --seg-active-bg: #ffffff;
+  --seg-active-shadow: 0 1px 2px rgba(33, 35, 31, 0.08);
+
+  --display-grad: none;
+
+  --topbar-grad: #ffffff;
+  --topbar-shadow: 0 1px 0 #d5dddd;
+  --panel-grad: #ffffff;
+
+  --map-backdrop: #f5f7f7;
+  --map-veil: transparent;
+  --chip-bg: #ffffff;
+  --chip-shadow: none;
+  --ctrl-bg: #ffffff;
+  --ctrl-hover: rgba(0, 60, 70, 0.08);
+  --glyph-filter: none;
+  --bar-glow: none;
+  --accent-text-glow: none;
+  --attrib-bg: #ffffff;
+  --attrib-text: #6b756f;
+  --attrib-link: var(--brand-glow, #00afaf);
+  --popup-bg: #ffffff;
+  --popup-shadow: none;
+
+  --warn-bg: #fffeeb;
+  --warn-border: #e6e600;
+  --warn-text: #5c5c00;
+
+  background-color: #ffffff;
+  background-image: none;
+}
+
+/* Kill glass / color-shift effects under DMH only (Vehicle OEM path untouched). */
+.mom-canvas[data-agency="dealer-media-house"] *,
+.mom-canvas[data-agency="dealer-media-house"] *::before,
+.mom-canvas[data-agency="dealer-media-house"] *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.mom-canvas[data-agency="dealer-media-house"] .mom-map-shell .maplibregl-ctrl-group,
+.mom-canvas[data-agency="dealer-media-house"] .mom-map-chip,
+.mom-canvas[data-agency="dealer-media-house"] .maplibregl-popup.mom-popup .maplibregl-popup-content,
+.mom-canvas[data-agency="dealer-media-house"] .mom-card,
+.mom-canvas[data-agency="dealer-media-house"] .mom-topbar,
+.mom-canvas[data-agency="dealer-media-house"] .mom-panel {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.mom-canvas[data-agency="dealer-media-house"] {
+  --glyph-filter: none;
+  --bar-glow: none;
+  --accent-text-glow: none;
+}
+
+/* Flat fills via --accent so Vehicle brandVars still drive the hue. */
+.mom-canvas[data-agency="dealer-media-house"] .mom-btn-accent:hover:not(:disabled),
+.mom-canvas[data-agency="dealer-media-house"] .mom-btn-accent {
+  filter: none !important;
+  background-image: none !important;
+  background-color: var(--accent);
+  box-shadow: none;
+}
+
+/* Light: primary buttons use primary (--accent → --brand-primary).
+   Links / secondary actions use secondary (--brand-glow). */
+.mom-canvas[data-agency="dealer-media-house"][data-theme="light"] .mom-link,
+.mom-canvas[data-agency="dealer-media-house"][data-theme="light"] .mom-nav-btn:hover {
+  color: var(--brand-glow, #00afaf);
+}
+
+.mom-canvas[data-agency="dealer-media-house"][data-theme="light"] .mom-btn:hover:not(:disabled) {
+  border-color: var(--brand-glow, #00afaf);
+  color: var(--brand-glow, #00afaf);
+}
+
+.mom-canvas[data-agency="dealer-media-house"] .mom-bar-fill {
+  background-image: none !important;
+  background-color: var(--accent);
+  box-shadow: none !important;
+}
+
+.mom-canvas[data-agency="dealer-media-house"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon,
+.mom-canvas[data-agency="dealer-media-house"] .maplibregl-ctrl button {
+  filter: none !important;
+}
+
+.mom-canvas[data-agency="dealer-media-house"] .drop-shadow-sm,
+.mom-canvas[data-agency="dealer-media-house"] [class*="drop-shadow"] {
+  filter: none !important;
+}
+
+/* Header monogram: no soft glow halo (inline boxShadow from PresentationHeader). */
+.mom-canvas[data-agency="dealer-media-house"] .mom-topbar span.grid.place-items-center {
+  box-shadow: none !important;
+}
+
+.mom-canvas[data-agency="dealer-media-house"] .mom-display {
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  color: var(--ink);
+}
+
+.mom-canvas[data-agency="dealer-media-house"] .mom-display-accent {
+  text-shadow: none;
+  color: var(--accent);
+}
+
+.mom-canvas[data-agency="dealer-media-house"] .mom-eyebrow,
+.mom-canvas[data-agency="dealer-media-house"] .mom-display,
+.mom-canvas[data-agency="dealer-media-house"] .mom-display-accent,
+.mom-canvas[data-agency="dealer-media-house"] h1,
+.mom-canvas[data-agency="dealer-media-house"] h2,
+.mom-canvas[data-agency="dealer-media-house"] h3,
+.mom-canvas[data-agency="dealer-media-house"] .mom-stat {
+  font-family: var(--font-heading);
+  font-weight: 700;
+}
+
+.mom-canvas[data-agency="dealer-media-house"] .mom-btn,
+.mom-canvas[data-agency="dealer-media-house"] .mom-btn-accent,
+.mom-canvas[data-agency="dealer-media-house"] .mom-nav-btn,
+.mom-canvas[data-agency="dealer-media-house"] .mom-input,
+.mom-canvas[data-agency="dealer-media-house"] input,
+.mom-canvas[data-agency="dealer-media-house"] label,
+.mom-canvas[data-agency="dealer-media-house"] select,
+.mom-canvas[data-agency="dealer-media-house"] textarea,
+.mom-canvas[data-agency="dealer-media-house"] .mom-segment-btn,
+.mom-canvas[data-agency="dealer-media-house"] .maplibregl-popup.mom-popup .maplibregl-popup-content {
+  font-family: var(--font-body);
+}
+
+/* Strip residual accent glow halos (dashboard live-dot, chips) under DMH only. */
+.mom-canvas[data-agency="dealer-media-house"] .mom-tile,
+.mom-canvas[data-agency="dealer-media-house"] .mom-btn-accent,
+.mom-canvas[data-agency="dealer-media-house"] .mom-bar-fill {
+  box-shadow: none !important;
+}
+
 .tnum {
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
@@ -264,14 +549,18 @@ body {
 }
 
 .mom-stat {
-  font-variant-numeric: tabular-nums;
+  /* Lining + tabular: Questa Sans defaults to oldstyle figures (6 sits
+     above 3). Force even-height digits for KPI / dashboard numbers. */
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
   letter-spacing: -0.025em;
   line-height: 1;
   color: var(--ink);
 }
 
 .mom-display {
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
   letter-spacing: -0.035em;
   line-height: 0.95;
   background: var(--display-grad);
@@ -281,6 +570,8 @@ body {
 }
 
 .mom-display-accent {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
   color: var(--accent);
   text-shadow: var(--accent-text-glow);
 }
@@ -565,7 +856,17 @@ body {
   border-radius: 11px;
   box-shadow: var(--chip-shadow);
   overflow: hidden;
-  backdrop-filter: blur(10px);
+}
+
+.mom-map-chip {
+  background: var(--chip-bg);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 9px 15px;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  color: var(--ink-2);
+  box-shadow: var(--chip-shadow);
 }
 
 .mom-map-shell .maplibregl-ctrl-group button {
@@ -595,6 +896,44 @@ body {
   color: var(--attrib-link);
 }
 
+/* ZIP detail card: fixed upper-right, clear of +/− zoom controls (~34px + margins). */
+.mom-zip-hover-dock {
+  position: absolute;
+  top: 10px;
+  right: 56px;
+  z-index: 5;
+  width: 240px;
+  max-width: min(240px, calc(100% - 72px));
+  max-height: min(220px, 42vh);
+  border-radius: 10px;
+  background: var(--popup-bg);
+  border: 1px solid var(--line);
+  box-shadow: var(--popup-shadow);
+  overflow: hidden;
+  pointer-events: auto;
+  font-family: "Questa Sans", system-ui, sans-serif;
+}
+
+.mom-zip-hover-dock .mom-popup-inner--zip {
+  width: 100% !important;
+  max-width: none !important;
+  max-height: min(220px, 42vh);
+}
+
+.mom-zip-hover-dock .mom-popup-seg-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) transparent;
+}
+
+.mom-zip-hover-dock .mom-popup-seg-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.mom-zip-hover-dock .mom-popup-seg-scroll::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 999px;
+}
+
 .mom-map-chip {
   background: var(--chip-bg);
   border: 1px solid var(--line);
@@ -604,7 +943,6 @@ body {
   letter-spacing: 0.01em;
   color: var(--ink-2);
   box-shadow: var(--chip-shadow);
-  backdrop-filter: blur(12px);
 }
 
 .mom-alert {
@@ -612,7 +950,6 @@ body {
   background: var(--alert-bg);
   border: 1px solid var(--alert-border);
   color: var(--alert-text);
-  backdrop-filter: blur(10px);
 }
 
 .mom-success {
@@ -632,19 +969,33 @@ body {
 /* —— Popups —— */
 .maplibregl-popup.mom-popup .maplibregl-popup-content {
   padding: 0;
-  border-radius: 13px;
+  border-radius: 10px;
   background: var(--popup-bg);
   border: 1px solid var(--line);
   box-shadow: var(--popup-shadow);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
-  overflow: visible;
-  backdrop-filter: blur(14px);
+  font-family: "Questa Sans", system-ui, sans-serif;
+  overflow: hidden;
+  max-height: min(220px, 42vh);
 }
 
 .maplibregl-popup.mom-popup {
   z-index: 4;
-  max-width: none !important;
+  max-width: 260px !important;
+  pointer-events: auto;
+}
+
+.maplibregl-popup.mom-popup .mom-popup-seg-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) transparent;
+}
+
+.maplibregl-popup.mom-popup .mom-popup-seg-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.maplibregl-popup.mom-popup .mom-popup-seg-scroll::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 999px;
 }
 
 .maplibregl-popup.mom-popup .maplibregl-popup-tip {
@@ -679,13 +1030,13 @@ body {
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .mom-popup-inner--zip {
-  min-width: 228px;
-  max-width: 300px;
-  padding: 14px 16px 12px;
+  min-width: 0;
+  max-width: 240px;
+  padding: 8px 10px;
 }
 
 .mom-popup-inner--excluded .mom-popup-hero-value {
@@ -704,7 +1055,7 @@ body {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
   color: var(--ink);
 }
 
@@ -750,7 +1101,7 @@ body {
   font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .mom-popup-seg-section {
@@ -811,7 +1162,7 @@ body {
   font-weight: 700;
   line-height: 1.35;
   color: var(--ink);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .mom-popup-seg-bar {

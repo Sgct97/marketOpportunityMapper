@@ -36,7 +36,8 @@ import {
   type RadiusMiles,
 } from '@/lib/projects/settings';
 import { saveProjectMapSettings } from '@/app/actions/project-settings';
-import { captureMapForExport } from '@/lib/map/export-capture';
+import { captureMapForExport, captureMapPreview } from '@/lib/map/export-capture';
+import type { MapImage } from '@/lib/map/export-capture';
 import { MapView } from '@/components/map/MapView';
 import { DashboardView } from '@/components/dashboard/DashboardView';
 import {
@@ -94,6 +95,7 @@ export function PresentationWorkspace({
   const clientOptions = useMemo(() => clientDealerships(dealerships), [dealerships]);
 
   const [view, setView] = useState<PresentationView>('map');
+  const [mapPreview, setMapPreview] = useState<MapImage | null>(null);
   // Default to dark on both server and first client render to avoid a hydration
   // mismatch; the saved preference is applied in an effect after mount.
   const [theme, setTheme] = useState<PresentationTheme>('dark');
@@ -125,6 +127,7 @@ export function PresentationWorkspace({
   );
   const [showRadiusLayer, setShowRadiusLayer] = useState(parsed.showRadiusLayer !== false);
   const [excludedZips, setExcludedZips] = useState<string[]>(parsed.excludedZips ?? []);
+  const [showComposition, setShowComposition] = useState(true);
 
   const activeRows = useMemo(
     () => filterRowsByExcludedZips(rows, excludedZips),
@@ -254,13 +257,52 @@ export function PresentationWorkspace({
     [projectId]
   );
 
-  // Live MapLibre instance, captured for screenshot / PDF export.
+  // Live MapLibre instance, captured for screenshot / PDF export / dashboard preview.
   const mapInstanceRef = useRef<MapLibreMap | null>(null);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const viewRef = useRef(view);
+  viewRef.current = view;
 
   const exportFocus = useMemo(() => {
     if (focusDealership?.latitude == null || focusDealership?.longitude == null) return null;
     return { longitude: focusDealership.longitude, latitude: focusDealership.latitude };
   }, [focusDealership]);
+
+  const handleMapReady = useCallback((map: MapLibreMap | null) => {
+    mapInstanceRef.current = map;
+    if (!map) return;
+    // The hero preview mirrors the presenter's map, so re-shoot every time the
+    // map settles — `idle` fires after pan/zoom, layer changes, and tile loads.
+    // The camera is never moved here; that would fight the map's own fitBounds.
+    map.on('idle', () => {
+      if (viewRef.current !== 'map') return;
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = setTimeout(() => {
+        const image = captureMapPreview(mapInstanceRef.current);
+        if (image) setMapPreview(image);
+      }, 250);
+    });
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    },
+    []
+  );
+
+  const handleViewChange = useCallback((next: PresentationView) => {
+    // A hidden map stops rendering, so leaving the Map tab is the last moment we
+    // can match what the presenter just saw. `idle` alone isn't enough: change
+    // the radius and switch immediately and the refit lands after we're hidden.
+    // This is a plain canvas read — synchronous, no camera move, no awaits.
+    if (next !== 'map' && viewRef.current === 'map') {
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+      const image = captureMapPreview(mapInstanceRef.current);
+      if (image) setMapPreview(image);
+    }
+    setView(next);
+  }, []);
 
   const prepareMapForCapture = useCallback(async () => {
     if (view !== 'map') {
@@ -304,12 +346,17 @@ export function PresentationWorkspace({
     }
     const { buildMarketReport } = await import('@/lib/export/report');
     const { getAgencyBrand, loadLogoDataUrl } = await import('@/lib/agency-brand');
+    const { loadReportFonts } = await import('@/lib/export/fonts');
     const agencyBrand = getAgencyBrand(brandId);
-    const logoDataUrl = await loadLogoDataUrl(agencyBrand.logo);
+    const [logoDataUrl, fonts] = await Promise.all([
+      loadLogoDataUrl(agencyBrand.logo),
+      loadReportFonts(),
+    ]);
     const doc = buildMarketReport({
       brand,
       agencyBrand,
       logoDataUrl,
+      fonts,
       projectName,
       datasetLabel,
       focusName: focusDealership?.name ?? null,
@@ -318,10 +365,10 @@ export function PresentationWorkspace({
       mapImage: image,
       zipLabels,
       reachScope,
-      competitorsInScope: showCompetitorLayer && competitorOptions.length > 0,
+      includeComposition: showComposition,
     });
     doc.save(`${slugify(projectName)}-market-report.pdf`);
-  }, [captureExportImage, brand, brandId, projectName, datasetLabel, focusDealership, radiusMiles, dashboardModel, zipLabels, reachScope, showCompetitorLayer, competitorOptions.length]);
+  }, [captureExportImage, brand, brandId, projectName, datasetLabel, focusDealership, radiusMiles, dashboardModel, zipLabels, reachScope, showComposition]);
 
   function toggleType(type: string) {
     setSelectedTypes(prev =>
@@ -348,18 +395,21 @@ export function PresentationWorkspace({
     persistSettings({ accentSource: source });
   }
 
+  const excludedZipsRef = useRef(excludedZips);
+  excludedZipsRef.current = excludedZips;
+
   const handleToggleZipExcluded = useCallback(
     (zip: string) => {
-      setExcludedZips(prev => {
-        const next = toggleExcludedZip(prev, zip);
-        persistSettings({ excludedZips: next });
-        return next;
-      });
+      const next = toggleExcludedZip(excludedZipsRef.current, zip);
+      excludedZipsRef.current = next;
+      setExcludedZips(next);
+      persistSettings({ excludedZips: next });
     },
     [persistSettings]
   );
 
   const handleRestoreAllZips = useCallback(() => {
+    excludedZipsRef.current = [];
     setExcludedZips([]);
     persistSettings({ excludedZips: [] });
   }, [persistSettings]);
@@ -388,13 +438,18 @@ export function PresentationWorkspace({
   const accentColor = theme === 'light' ? brand.primaryColor : brand.glow;
 
   return (
-    <div className="mom-canvas flex flex-col h-screen" data-theme={theme} style={brandVars}>
+    <div
+      className="mom-canvas flex flex-col h-screen"
+      data-theme={theme}
+      data-agency={brandId}
+      style={brandVars}
+    >
       <PresentationHeader
         projectId={projectId}
         projectName={projectName}
         brandName={brand.name}
         view={view}
-        onViewChange={setView}
+        onViewChange={handleViewChange}
         contextLabel={contextLabel}
         theme={theme}
         onToggleTheme={toggleTheme}
@@ -459,9 +514,7 @@ export function PresentationWorkspace({
             }}
             marketAnalysis={marketAnalysis}
             hasFocusDealership={hasFocus}
-            onMapReady={m => {
-              mapInstanceRef.current = m;
-            }}
+            onMapReady={handleMapReady}
           />
         </div>
 
@@ -476,8 +529,11 @@ export function PresentationWorkspace({
               focusName={focusDealership?.name ?? null}
               radiusMiles={radiusMiles}
               reachScope={reachScope}
-              competitorsInScope={showCompetitorLayer && competitorOptions.length > 0}
               excludedZipCount={excludedZips.length}
+              showComposition={showComposition}
+              onShowCompositionChange={setShowComposition}
+              mapPreviewUrl={mapPreview?.dataUrl ?? null}
+              onOpenMap={() => setView('map')}
             />
           </div>
         )}

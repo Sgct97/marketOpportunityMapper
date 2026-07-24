@@ -7,6 +7,16 @@ describe('getAgencyBrand', () => {
     expect(getAgencyBrand(undefined).name).toBe('Dealer Media House');
   });
 
+  it('uses Brittany DMH brand palette', () => {
+    const dmh = getAgencyBrand('dealer-media-house');
+    expect(dmh.primaryColor.toLowerCase()).toBe('#003c46');
+    expect(dmh.glow.toLowerCase()).toBe('#00afaf');
+    expect(dmh.secondaryColor.toLowerCase()).toBe('#00afaf');
+    expect(dmh.textColor.toLowerCase()).toBe('#21231f');
+    expect(dmh.highlightColor?.toLowerCase()).toBe('#ffff00');
+    expect(dmh.tertiaryColor?.toLowerCase()).toBe('#21231f');
+  });
+
   it('resolves known agency ids', () => {
     expect(getAgencyBrand('dealers-direct-us').logo).toBe('/ddus-logo.png');
   });
