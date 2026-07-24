@@ -221,6 +221,11 @@ export function OpportunityMap({
   const clickBoundRef = useRef(false);
   const dealerBoundRef = useRef(false);
   const hoveredFeatureIdRef = useRef<string | number | null>(null);
+  const popupHoveredRef = useRef(false);
+  const hidePopupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const switchZipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dockZipRef = useRef<string | null>(null);
+  const pendingZipRef = useRef<string | null>(null);
   const onFocusRef = useRef(onFocusDealership);
   const focusIdRef = useRef(focusDealershipId);
   const onMapReadyRef = useRef(onMapReady);
@@ -248,6 +253,7 @@ export function OpportunityMap({
   const [boundaryLoading, setBoundaryLoading] = useState(false);
   const [boundaryError, setBoundaryError] = useState<string | null>(null);
   const [featureCount, setFeatureCount] = useState(0);
+  const [zipDockHtml, setZipDockHtml] = useState<string | null>(null);
   const boundaryDataRef = useRef<FeatureCollection<Geometry> | null>(null);
 
   const aggregate = useMemo(
@@ -369,53 +375,140 @@ export function OpportunityMap({
     }
   }, []);
 
+  const buildZipDockHtml = useCallback(
+    (zip: string, excluded: boolean, count: number, typeLabelForZip: string) => {
+      const segments = segmentMetricsForZip(rowsRef.current, zip);
+      const totalCount = segments.reduce((sum, seg) => sum + seg.count, 0);
+      return audiencePopupHtml({
+        zip,
+        typeLabel: typeLabelForZip,
+        count: totalCount > 0 ? totalCount : count,
+        accentColor: primaryColor,
+        segments,
+        excluded,
+        theme: themeRef.current,
+        zipLabels: zipLabelsRef.current,
+      });
+    },
+    [primaryColor]
+  );
+
+  const showZipDock = useCallback(
+    (zip: string, excluded: boolean, count: number, typeLabelForZip: string) => {
+      dockZipRef.current = zip;
+      pendingZipRef.current = zip;
+      setZipDockHtml(buildZipDockHtml(zip, excluded, count, typeLabelForZip));
+    },
+    [buildZipDockHtml]
+  );
+
+  const clearZipDock = useCallback(() => {
+    dockZipRef.current = null;
+    pendingZipRef.current = null;
+    setZipDockHtml(null);
+  }, []);
+
+  // Keep the open card in sync when include/exclude flips for that ZIP.
+  useEffect(() => {
+    const zip = dockZipRef.current;
+    if (!zip) return;
+    const excluded = excludedZips.includes(zip);
+    const count = aggregate.byZip[zip] ?? 0;
+    setZipDockHtml(buildZipDockHtml(zip, excluded, count, typeLabel));
+  }, [excludedZips, aggregate.byZip, typeLabel, buildZipDockHtml, theme, zipLabels]);
+
   const bindHoverHandlers = useCallback(
     (map: maplibregl.Map) => {
       if (hoverBoundRef.current) return;
       hoverBoundRef.current = true;
+
+      const ZIP_SWITCH_PAUSE_MS = 350;
+      const ZIP_HIDE_GRACE_MS = 400;
+
+      const cancelHideTimer = () => {
+        if (hidePopupTimerRef.current != null) {
+          clearTimeout(hidePopupTimerRef.current);
+          hidePopupTimerRef.current = null;
+        }
+      };
+
+      const cancelSwitchTimer = () => {
+        if (switchZipTimerRef.current != null) {
+          clearTimeout(switchZipTimerRef.current);
+          switchZipTimerRef.current = null;
+        }
+      };
+
+      const scheduleHideDock = () => {
+        cancelHideTimer();
+        hidePopupTimerRef.current = setTimeout(() => {
+          if (popupHoveredRef.current) return;
+          clearZipDock();
+          map.getCanvas().style.cursor = '';
+          clearHoverState(map);
+        }, ZIP_HIDE_GRACE_MS);
+      };
 
       map.on('mousemove', 'zip-fill', e => {
         if (!e.features?.[0]) return;
         const feature = e.features[0];
         const props = feature.properties || {};
         const zip = String(props.ZCTA5 || props.GEOID || props.BASENAME || '');
+        if (!zip) return;
+
         const count = Number(props.audienceCount ?? 0);
         const excluded = Boolean(props.excluded);
-        const segments = segmentMetricsForZip(rowsRef.current, zip);
-        const totalCount = segments.reduce((sum, seg) => sum + seg.count, 0);
+        const typeLabelForZip = String(props.audienceTypeLabel || typeLabel);
         const featureId = feature.id;
+        const featureChanged =
+          featureId != null && hoveredFeatureIdRef.current !== featureId;
 
-        if (featureId != null && hoveredFeatureIdRef.current !== featureId) {
+        cancelHideTimer();
+
+        if (featureChanged) {
           clearHoverState(map);
           hoveredFeatureIdRef.current = featureId;
           map.setFeatureState({ source: 'zip-areas', id: featureId }, { hover: true });
         }
 
         map.getCanvas().style.cursor = 'pointer';
-        popupRef.current
-          ?.setLngLat(e.lngLat)
-          .setHTML(
-            audiencePopupHtml({
-              zip,
-              typeLabel: String(props.audienceTypeLabel || typeLabel),
-              count: totalCount > 0 ? totalCount : count,
-              accentColor: primaryColor,
-              segments,
-              excluded,
-              theme: themeRef.current,
-              zipLabels: zipLabelsRef.current,
-            })
-          )
-          .addTo(map);
+
+        // Sticky card: show immediately if empty; otherwise require a brief pause on the new ZIP.
+        if (dockZipRef.current === zip) {
+          cancelSwitchTimer();
+          pendingZipRef.current = zip;
+          return;
+        }
+
+        if (!dockZipRef.current) {
+          cancelSwitchTimer();
+          showZipDock(zip, excluded, count, typeLabelForZip);
+          return;
+        }
+
+        if (pendingZipRef.current === zip && switchZipTimerRef.current != null) {
+          // Already waiting on this ZIP — keep the pause timer.
+          return;
+        }
+
+        cancelSwitchTimer();
+        pendingZipRef.current = zip;
+        switchZipTimerRef.current = setTimeout(() => {
+          switchZipTimerRef.current = null;
+          if (pendingZipRef.current !== zip) return;
+          showZipDock(zip, excluded, count, typeLabelForZip);
+        }, ZIP_SWITCH_PAUSE_MS);
       });
 
       map.on('mouseleave', 'zip-fill', () => {
+        cancelSwitchTimer();
+        pendingZipRef.current = dockZipRef.current;
         map.getCanvas().style.cursor = '';
-        popupRef.current?.remove();
         clearHoverState(map);
+        if (!popupHoveredRef.current) scheduleHideDock();
       });
     },
-    [typeLabel, primaryColor, clearHoverState]
+    [typeLabel, clearHoverState, clearZipDock, showZipDock]
   );
 
   const bindZipClickHandler = useCallback((map: maplibregl.Map) => {
@@ -523,7 +616,7 @@ export function OpportunityMap({
         closeOnClick: false,
         className: 'mom-popup',
         offset: 12,
-        maxWidth: '420px',
+        maxWidth: '260px',
       });
 
       const onStyleReady = () => initLayers(map);
@@ -558,6 +651,18 @@ export function OpportunityMap({
       clickBoundRef.current = false;
       dealerBoundRef.current = false;
       hoveredFeatureIdRef.current = null;
+      popupHoveredRef.current = false;
+      dockZipRef.current = null;
+      pendingZipRef.current = null;
+      if (hidePopupTimerRef.current != null) {
+        clearTimeout(hidePopupTimerRef.current);
+        hidePopupTimerRef.current = null;
+      }
+      if (switchZipTimerRef.current != null) {
+        clearTimeout(switchZipTimerRef.current);
+        switchZipTimerRef.current = null;
+      }
+      setZipDockHtml(null);
       onMapReadyRef.current?.(null);
       popupRef.current?.remove();
       popupRef.current = null;
@@ -728,6 +833,37 @@ export function OpportunityMap({
         <div className="mom-alert absolute top-14 left-4 right-4 z-10 max-w-md px-4 py-2.5 text-xs">
           {boundaryError}
         </div>
+      )}
+
+      {zipDockHtml && (
+        <div
+          className="mom-zip-hover-dock"
+          onMouseEnter={() => {
+            popupHoveredRef.current = true;
+            if (hidePopupTimerRef.current != null) {
+              clearTimeout(hidePopupTimerRef.current);
+              hidePopupTimerRef.current = null;
+            }
+          }}
+          onMouseLeave={() => {
+            popupHoveredRef.current = false;
+            hidePopupTimerRef.current = setTimeout(() => {
+              if (popupHoveredRef.current) return;
+              dockZipRef.current = null;
+              pendingZipRef.current = null;
+              setZipDockHtml(null);
+              const map = mapRef.current;
+              if (map) {
+                map.getCanvas().style.cursor = '';
+                clearHoverState(map);
+              }
+            }, 400);
+          }}
+          onWheel={event => {
+            event.stopPropagation();
+          }}
+          dangerouslySetInnerHTML={{ __html: zipDockHtml }}
+        />
       )}
 
       {layersReady && showCompetitorLayer && rankedCompetitors.length > 0 && (

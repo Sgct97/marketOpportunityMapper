@@ -349,18 +349,21 @@ export function PresentationWorkspace({
     persistSettings({ accentSource: source });
   }
 
+  const excludedZipsRef = useRef(excludedZips);
+  excludedZipsRef.current = excludedZips;
+
   const handleToggleZipExcluded = useCallback(
     (zip: string) => {
-      setExcludedZips(prev => {
-        const next = toggleExcludedZip(prev, zip);
-        persistSettings({ excludedZips: next });
-        return next;
-      });
+      const next = toggleExcludedZip(excludedZipsRef.current, zip);
+      excludedZipsRef.current = next;
+      setExcludedZips(next);
+      persistSettings({ excludedZips: next });
     },
     [persistSettings]
   );
 
   const handleRestoreAllZips = useCallback(() => {
+    excludedZipsRef.current = [];
     setExcludedZips([]);
     persistSettings({ excludedZips: [] });
   }, [persistSettings]);
