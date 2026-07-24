@@ -2,7 +2,12 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { isAuthDisabled } from '@/lib/auth-config';
 import { updateSession } from '@/lib/supabase/middleware';
 
-const PUBLIC_PATHS = ['/login', '/auth/callback'];
+const PUBLIC_PATHS = ['/login', '/auth/callback', '/api/zcta-boundaries'];
+
+function isPublicPath(pathname: string): boolean {
+  if (pathname === '/p' || pathname.startsWith('/p/')) return true;
+  return PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(`${p}/`));
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -21,7 +26,7 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  if (PUBLIC_PATHS.some(p => pathname.startsWith(p))) {
+  if (isPublicPath(pathname)) {
     return response;
   }
 

@@ -17,6 +17,9 @@ interface Props {
   onToggleTheme: () => void;
   onExportPdf: () => void | Promise<void>;
   onExportPng: () => void | Promise<void>;
+  /** Read-only shared presentation: hide agency navigation. */
+  shareMode?: boolean;
+  shareExpiresLabel?: string | null;
 }
 
 function SunIcon() {
@@ -96,29 +99,35 @@ export function PresentationHeader({
   onToggleTheme,
   onExportPdf,
   onExportPng,
+  shareMode = false,
+  shareExpiresLabel = null,
 }: Props) {
   const monogram = (brandName?.trim()?.[0] ?? 'M').toUpperCase();
 
   return (
     <header className="mom-topbar relative z-20 flex items-center justify-between gap-4 border-b border-[var(--line)] px-4 sm:px-6 h-16 shrink-0">
       <div className="flex items-center gap-3 min-w-0 flex-1">
-        <Link
-          href="/"
-          className="mom-nav-btn hidden sm:inline-flex items-center gap-1.5"
-          title="Back to all projects"
-        >
-          <HomeIcon />
-          Projects
-        </Link>
-        <Link
-          href={`/projects/${projectId}`}
-          className="mom-nav-btn hidden sm:inline-flex items-center gap-1.5"
-          title="Back to project setup"
-        >
-          <span aria-hidden>←</span>
-          Setup
-        </Link>
-        <span className="hidden sm:block h-6 w-px bg-[var(--line)]" />
+        {!shareMode && (
+          <>
+            <Link
+              href="/"
+              className="mom-nav-btn hidden sm:inline-flex items-center gap-1.5"
+              title="Back to all projects"
+            >
+              <HomeIcon />
+              Projects
+            </Link>
+            <Link
+              href={`/projects/${projectId}`}
+              className="mom-nav-btn hidden sm:inline-flex items-center gap-1.5"
+              title="Back to project setup"
+            >
+              <span aria-hidden>←</span>
+              Setup
+            </Link>
+            <span className="hidden sm:block h-6 w-px bg-[var(--line)]" />
+          </>
+        )}
         <span
           className="grid place-items-center h-9 w-9 rounded-xl text-[15px] font-semibold shrink-0"
           style={{
@@ -134,7 +143,11 @@ export function PresentationHeader({
             {projectName}
           </h1>
           <p className="text-[12px] text-[var(--muted)] truncate leading-tight">
-            {brandName} · Market opportunity
+            {shareMode
+              ? shareExpiresLabel
+                ? `Shared presentation · ${shareExpiresLabel}`
+                : 'Shared presentation'
+              : `${brandName} · Market opportunity`}
           </p>
         </div>
       </div>

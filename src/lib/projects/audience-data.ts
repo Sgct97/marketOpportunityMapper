@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AudienceZipRow } from '@/lib/audience/aggregate';
 import { normalizeAudienceType } from '@/lib/audience/validate';
 import { createDataClient } from '@/lib/supabase/data';
@@ -11,8 +12,11 @@ export interface ProjectAudiencePayload {
   rows: AudienceZipRow[];
 }
 
-export async function loadProjectAudience(projectId: string): Promise<ProjectAudiencePayload | null> {
-  const supabase = await createDataClient();
+export async function loadProjectAudience(
+  projectId: string,
+  client?: SupabaseClient
+): Promise<ProjectAudiencePayload | null> {
+  const supabase = client ?? (await createDataClient());
 
   const { data: project } = await supabase
     .from('projects')
@@ -60,7 +64,7 @@ export async function loadProjectAudience(projectId: string): Promise<ProjectAud
 const ZIP_COUNTS_PAGE_SIZE = 1000;
 
 async function loadAllZipCounts(
-  supabase: Awaited<ReturnType<typeof createDataClient>>,
+  supabase: SupabaseClient,
   datasetId: string
 ): Promise<AudienceZipRow[]> {
   const rows: AudienceZipRow[] = [];
