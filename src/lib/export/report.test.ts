@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeAll } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { defaultAgencyBrand, loadLogoDataUrl } from '@/lib/agency-brand';
 import { resolveBrandAccent } from '@/lib/brands';
@@ -7,6 +7,7 @@ import {
   buildMarketReport,
   estimatePage1HeightWithoutComposition,
 } from './report';
+import { loadReportFonts, type ReportFontFiles } from './fonts';
 
 function pdfPageHeightsMm(data: ArrayBuffer): number[] {
   const raw = Buffer.from(data).toString('latin1');
@@ -20,6 +21,7 @@ function pdfPageHeightsMm(data: ArrayBuffer): number[] {
 const TINY_PNG =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
+let fonts: ReportFontFiles | null = null;
 const model: DashboardModel = {
   totalAudience: 948068,
   totalZips: 265,
@@ -98,12 +100,18 @@ const model: DashboardModel = {
 };
 
 describe('buildMarketReport', () => {
+  beforeAll(async () => {
+    fonts = await loadReportFonts();
+    expect(fonts).not.toBeNull();
+  });
+
   it('produces a two-page PDF when a map image is supplied', async () => {
     const logoDataUrl = await loadLogoDataUrl(defaultAgencyBrand.logo);
     const doc = buildMarketReport({
       brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
       agencyBrand: defaultAgencyBrand,
       logoDataUrl,
+      fonts,
       projectName: 'Fontana Hyundai',
       datasetLabel: 'Fontana Hyundai JUNE.xlsx',
       focusName: 'Fontana Hyundai',
@@ -114,6 +122,7 @@ describe('buildMarketReport', () => {
     });
 
     expect(doc.getNumberOfPages()).toBe(2);
+    expect(doc.getFontList().QuestaSans).toEqual(['normal', 'bold']);
 
     const buf = Buffer.from(doc.output('arraybuffer'));
     expect(buf.length).toBeGreaterThan(1000);
@@ -124,6 +133,7 @@ describe('buildMarketReport', () => {
     const doc = buildMarketReport({
       brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
       agencyBrand: defaultAgencyBrand,
+      fonts,
       projectName: 'Fontana Hyundai',
       datasetLabel: null,
       focusName: null,
@@ -141,6 +151,7 @@ describe('buildMarketReport', () => {
     const withComposition = buildMarketReport({
       brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
       agencyBrand: defaultAgencyBrand,
+      fonts,
       projectName: 'Fontana Hyundai',
       datasetLabel: null,
       focusName: null,
@@ -153,6 +164,7 @@ describe('buildMarketReport', () => {
     const withoutComposition = buildMarketReport({
       brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
       agencyBrand: defaultAgencyBrand,
+      fonts,
       projectName: 'Fontana Hyundai',
       datasetLabel: null,
       focusName: null,
@@ -172,6 +184,7 @@ describe('buildMarketReport', () => {
     const withComposition = buildMarketReport({
       brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
       agencyBrand: defaultAgencyBrand,
+      fonts,
       projectName: 'Fontana Hyundai',
       datasetLabel: null,
       focusName: 'CardinaleWay Hyundai - Glendora',
@@ -184,6 +197,7 @@ describe('buildMarketReport', () => {
     const withoutComposition = buildMarketReport({
       brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
       agencyBrand: defaultAgencyBrand,
+      fonts,
       projectName: 'Fontana Hyundai',
       datasetLabel: null,
       focusName: 'CardinaleWay Hyundai - Glendora',
@@ -211,16 +225,20 @@ describe('buildMarketReport', () => {
 
     // Height was applied before draw (matches estimator).
     const expected = estimatePage1HeightWithoutComposition(
-      model.tradeArea?.leadSegment?.name ?? model.topSegment?.name ?? null
+      model.tradeArea?.leadSegment?.name ?? model.topSegment?.name ?? null,
+      fonts
     );
     expect(withoutHeights[0]).toBeCloseTo(expected, 0);
   });
 
   it('does not put the focus dealer name in the trade-area KPI subtext', () => {
     const focusName = 'CardinaleWay Hyundai - Glendora';
+    // Helvetica keeps literal strings searchable in the PDF bytes; embedded
+    // Questa encodes glyphs and would break this content assertion.
     const doc = buildMarketReport({
       brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
       agencyBrand: defaultAgencyBrand,
+      fonts: null,
       projectName: 'test2',
       datasetLabel: null,
       focusName,

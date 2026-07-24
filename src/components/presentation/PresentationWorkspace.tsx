@@ -305,12 +305,17 @@ export function PresentationWorkspace({
     }
     const { buildMarketReport } = await import('@/lib/export/report');
     const { getAgencyBrand, loadLogoDataUrl } = await import('@/lib/agency-brand');
+    const { loadReportFonts } = await import('@/lib/export/fonts');
     const agencyBrand = getAgencyBrand(brandId);
-    const logoDataUrl = await loadLogoDataUrl(agencyBrand.logo);
+    const [logoDataUrl, fonts] = await Promise.all([
+      loadLogoDataUrl(agencyBrand.logo),
+      loadReportFonts(),
+    ]);
     const doc = buildMarketReport({
       brand,
       agencyBrand,
       logoDataUrl,
+      fonts,
       projectName,
       datasetLabel,
       focusName: focusDealership?.name ?? null,

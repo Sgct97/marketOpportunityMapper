@@ -11,6 +11,10 @@ import type { MapImage } from '@/lib/map/export-capture';
 import { formatZipDisplay } from '@/lib/map/zip-labels';
 import type { ZipLabel } from '@/lib/map/zip-labels';
 import { formatCompact, formatNumber, formatPercent, EMPTY_VALUE } from '@/lib/format';
+import {
+  registerReportFonts,
+  type ReportFontFiles,
+} from '@/lib/export/fonts';
 
 export type { MapImage };
 
@@ -21,6 +25,8 @@ export interface ReportInput {
   agencyBrand: AgencyBrandConfig;
   /** Pre-loaded logo data URL for jsPDF; omit to fall back to agency name text. */
   logoDataUrl?: string | null;
+  /** Embedded Questa Sans (Regular + Bold). Falls back to Helvetica if omitted. */
+  fonts?: ReportFontFiles | null;
   projectName: string;
   datasetLabel: string | null;
   focusName: string | null;
@@ -81,17 +87,21 @@ function formatDate(d: Date): string {
  * Mirrors the y-advancement in buildMarketReport's page-1 body (hero → KPIs)
  * so we can set MediaBox BEFORE drawing (required for correct PDF coords).
  */
-export function estimatePage1HeightWithoutComposition(leadSegmentName: string | null): number {
+export function estimatePage1HeightWithoutComposition(
+  leadSegmentName: string | null,
+  fonts?: ReportFontFiles | null
+): number {
   const probe = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+  const font = registerReportFonts(probe, fonts);
   let y = 58;
-  // Hero block
-  y += 16 + 9 + 6 + 8;
+  // Hero block (matches buildMarketReport page-1 spacing)
+  y += 18 + 10 + 6 + 9;
   if (leadSegmentName) {
-    y += 7 + 8;
-    probe.setFont('helvetica', 'bold');
+    y += 12 + 9;
+    probe.setFont(font, 'bold');
     probe.setFontSize(11);
     const nameLines = probe.splitTextToSize(leadSegmentName, CONTENT_W);
-    y += nameLines.length * 5.2 + 1 + 8;
+    y += nameLines.length * 5.2 + 2 + 8;
   }
   // Concentration callout + 2x2 KPI grid
   y += 16;
@@ -110,6 +120,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     brand,
     agencyBrand,
     logoDataUrl,
+    fonts,
     projectName,
     datasetLabel,
     focusName,
@@ -152,7 +163,8 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   const topZipsScope = useTradeArea ? `Within ${radiusMiles} mi` : 'Across market';
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-  doc.setFont('helvetica', 'normal');
+  const font = registerReportFonts(doc, fonts);
+  doc.setFont(font, 'normal');
 
   // When composition is off, page 1 must be short — but the height MUST be set
   // BEFORE any drawing. jsPDF bakes y→PDF transforms using the current page
@@ -161,7 +173,10 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   const facetsForPage1 = includeComposition ? model.composition.slice(0, 2) : [];
   const omitComposition = facetsForPage1.length === 0;
   if (omitComposition) {
-    doc.internal.pageSize.height = estimatePage1HeightWithoutComposition(leadSegment?.name ?? null);
+    doc.internal.pageSize.height = estimatePage1HeightWithoutComposition(
+      leadSegment?.name ?? null,
+      fonts
+    );
   }
 
   // ── helpers bound to this doc ──────────────────────────────────────────
@@ -169,11 +184,36 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   const setText = (c: Rgb) => doc.setTextColor(c[0], c[1], c[2]);
   const setStroke = (c: Rgb) => doc.setDrawColor(c[0], c[1], c[2]);
 
+  // Labels use the brand face; pure numerics use Helvetica so lining figures
+  // and stable advances match the on-site CSS `lining-nums` treatment (Questa's
+  // default oldstyle digits break baselines and bar alignment in PDF).
+  const NUM = 'helvetica';
+  const labelFont = (style: 'normal' | 'bold' = 'normal') => {
+    doc.setCharSpace(0);
+    doc.setFont(font, style);
+  };
+  const numFont = (style: 'normal' | 'bold' = 'bold') => {
+    doc.setCharSpace(0);
+    doc.setFont(NUM, style);
+  };
+
+  function write(
+    text: string | string[],
+    x: number,
+    y: number,
+    opts?: { align?: 'left' | 'center' | 'right'; baseline?: 'alphabetic' | 'top' | 'middle' | 'bottom' }
+  ) {
+    doc.setCharSpace(0);
+    doc.text(text, x, y, opts);
+  }
+
   function eyebrow(text: string, x: number, y: number) {
-    doc.setFont('helvetica', 'bold');
+    labelFont('bold');
     doc.setFontSize(7.5);
     setText(FAINT);
-    doc.text(text.toUpperCase(), x, y, { charSpace: 0.6 });
+    doc.setCharSpace(0.35);
+    doc.text(text.toUpperCase(), x, y);
+    doc.setCharSpace(0);
   }
 
   function drawHeaderBand() {
@@ -217,10 +257,10 @@ export function buildMarketReport(input: ReportInput): jsPDF {
       }
     }
     if (!logoPlaced) {
-      doc.setFont('helvetica', 'bold');
+      labelFont('bold');
       doc.setFontSize(16);
       setText(hexToRgb(agencyBrand.textColor));
-      doc.text(agencyBrand.name, MARGIN, bandMid + 2);
+      write(agencyBrand.name, MARGIN, bandMid + 2);
       lockX = MARGIN + doc.getTextWidth(agencyBrand.name) + 9;
     }
 
@@ -234,13 +274,15 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     const idMaxW = PAGE_W - MARGIN - idX;
     setFill(accent);
     doc.circle(idX + 1.1, bandMid - 6.6, 1.15, 'F');
-    doc.setFont('helvetica', 'bold');
+    labelFont('bold');
     doc.setFontSize(11);
     setText(FAINT);
-    doc.text('MARKET OPPORTUNITY REPORT', idX + 4.4, bandMid - 5.5, { charSpace: 0.7 });
+    doc.setCharSpace(0.35);
+    doc.text('MARKET OPPORTUNITY REPORT', idX + 4.4, bandMid - 5.5);
+    doc.setCharSpace(0);
 
     // Auto-fit the project name to one line: shrink before truncating.
-    doc.setFont('helvetica', 'bold');
+    labelFont('bold');
     let titleSize = 19;
     doc.setFontSize(titleSize);
     while (titleSize > 11 && doc.getTextWidth(projectName) > idMaxW) {
@@ -249,7 +291,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     }
     const titleLine = doc.splitTextToSize(projectName, idMaxW)[0] ?? projectName;
     setText(INK);
-    doc.text(titleLine, idX, bandMid + 6.5);
+    write(titleLine, idX, bandMid + 6.5);
   }
 
   function footer(pageLabel: string) {
@@ -257,11 +299,11 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     setStroke(LINE);
     doc.setLineWidth(0.2);
     doc.line(MARGIN, h - 14, PAGE_W - MARGIN, h - 14);
-    doc.setFont('helvetica', 'normal');
+    labelFont('normal');
     doc.setFontSize(7.5);
     setText(FAINT);
-    doc.text(agencyBrand.name, MARGIN, h - 9);
-    doc.text(pageLabel, PAGE_W - MARGIN, h - 9, { align: 'right' });
+    write(agencyBrand.name, MARGIN, h - 9);
+    write(pageLabel, PAGE_W - MARGIN, h - 9, { align: 'right' });
   }
 
   // KPI card
@@ -271,31 +313,32 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     doc.setLineWidth(0.2);
     doc.roundedRect(x, y, w, h, 2.5, 2.5, 'FD');
     eyebrow(label, x + 5, y + 7);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
+    numFont('bold');
+    doc.setFontSize(18);
     setText(INK);
-    doc.text(value, x + 5, y + 18);
+    write(value, x + 5, y + 18);
     if (badge) {
+      numFont('bold');
+      doc.setFontSize(8);
       const bw = doc.getTextWidth(badge) + 6;
       setFill(accentSoft);
       doc.roundedRect(x + w - bw - 5, y + 11.5, bw, 6.5, 3.25, 3.25, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
       setText(accent);
-      doc.text(badge, x + w - bw - 5 + bw / 2, y + 16, { align: 'center' });
+      write(badge, x + w - bw - 5 + bw / 2, y + 16, { align: 'center' });
     }
-    doc.setFont('helvetica', 'normal');
+    labelFont('normal');
     doc.setFontSize(7.5);
     setText(MUTED);
     const subLines = doc.splitTextToSize(sub, w - 10);
-    doc.text(subLines.slice(0, 2), x + 5, y + 25);
+    write(subLines.slice(0, 2), x + 5, y + 25);
   }
 
-  // Horizontal proportion bar
+  // Horizontal proportion bar — always absolute page coords (no text matrix).
   function bar(x: number, y: number, w: number, ratio: number) {
+    doc.setCharSpace(0);
     setFill(tint(LINE, 0.3));
     doc.roundedRect(x, y, w, 2.2, 1.1, 1.1, 'F');
-    const fw = Math.max(1.5, Math.min(w, w * ratio));
+    const fw = Math.max(1.5, Math.min(w, w * Math.max(0, Math.min(1, ratio))));
     setFill(accent);
     doc.roundedRect(x, y, fw, 2.2, 1.1, 1.1, 'F');
   }
@@ -330,7 +373,9 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     buckets: { label: string; share: number }[],
     title: string
   ) {
-    const r = diameter / 2 - thickness / 2;
+    const outerR = diameter / 2;
+    const r = outerR - thickness / 2;
+    const holeR = outerR - thickness;
     // Track ring
     strokeArc(cx, cy, r, 0, 359.999, thickness, tint(LINE, 0.15));
     // Arcs, starting at top (-90°), sweeping clockwise, with a small gap.
@@ -342,15 +387,47 @@ export function buildMarketReport(input: ReportInput): jsPDF {
       cursor += b.share * 360;
     });
     doc.setLineCap('round');
-    // Center label: top bucket share + facet title
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(15);
+
+    // Center share — Helvetica lining figures so digits share one baseline.
+    numFont('bold');
+    doc.setFontSize(12);
     setText(INK);
-    doc.text(buckets[0] ? formatPercent(buckets[0].share) : EMPTY_VALUE, cx, cy + 0.5, { align: 'center' });
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6);
+    write(buckets[0] ? formatPercent(buckets[0].share) : EMPTY_VALUE, cx, cy - 0.8, {
+      align: 'center',
+    });
+
+    // Facet/bucket title must stay inside the hole. Chord width shrinks below
+    // center, so wrap (and shrink) to ~75% of the hole diameter with no tracking.
+    const upper = title.trim().toUpperCase();
+    if (!upper || holeR <= 0) return;
+
+    const maxTitleW = Math.max(6, holeR * 2 * 0.75);
+    let titleSize = 5.5;
+    let lines: string[] = [upper];
+    labelFont('bold');
+    for (; titleSize >= 4; titleSize -= 0.25) {
+      doc.setFontSize(titleSize);
+      lines = doc.splitTextToSize(upper, maxTitleW);
+      const widest = Math.max(...lines.map(line => doc.getTextWidth(line)), 0);
+      if (lines.length <= 2 && widest <= maxTitleW + 0.1) break;
+    }
+    lines = lines.slice(0, 2);
+
+    const lineH = titleSize * 0.42;
+    const blockH = lineH * lines.length;
+    // Keep the title block inside the hole: bottom ≤ cy + holeR - padding.
+    const maxBottom = cy + holeR - 1.1;
+    let titleY = cy + 2.6;
+    if (titleY + blockH - lineH > maxBottom) {
+      titleY = maxBottom - blockH + lineH;
+    }
+
     setText(FAINT);
-    doc.text(title.toUpperCase(), cx, cy + 5, { align: 'center', charSpace: 0.4 });
+    labelFont('bold');
+    doc.setFontSize(titleSize);
+    lines.forEach((line, i) => {
+      write(line, cx, titleY + i * lineH, { align: 'center' });
+    });
   }
 
   // ═══════════════════════ PAGE 1 — Story & metrics ═══════════════════════
@@ -360,54 +437,55 @@ export function buildMarketReport(input: ReportInput): jsPDF {
 
   // Hero — total reach first, then the largest single segment underneath.
   eyebrow(`Market opportunity · ${subjectName}`, MARGIN, y);
-  y += 16;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(42);
+  y += 18;
+  numFont('bold');
+  doc.setFontSize(40);
   setText(accent);
   const reachValue = formatCompact(heroReach);
-  doc.text(reachValue, MARGIN, y);
-  y += 9;
-  doc.setFont('helvetica', 'bold');
+  write(reachValue, MARGIN, y);
+  y += 10;
+  labelFont('bold');
   doc.setFontSize(12.5);
   setText(INK);
-  doc.text(scopeCopy.headline, MARGIN, y);
+  write(scopeCopy.headline, MARGIN, y);
   y += 6;
-  doc.setFont('helvetica', 'normal');
+  labelFont('normal');
   doc.setFontSize(8.5);
   setText(FAINT);
   const reachMeta = `${scopeCopy.segmentPhrase} · ${formatNumber(heroZips)} ZIPs · overlapping${
     useTradeArea ? ` · within ${radiusMiles} mi` : ' · across the market'
   }${excludedZipCount > 0 ? ` · ${formatNumber(excludedZipCount)} ZIP${excludedZipCount === 1 ? '' : 's'} excluded` : ''}`;
-  doc.text(reachMeta, MARGIN, y);
-  y += 8;
+  write(reachMeta, MARGIN, y);
+  y += 9;
 
   if (leadSegment) {
     setStroke(LINE);
     doc.setLineWidth(0.2);
     doc.line(MARGIN, y, MARGIN + CONTENT_W, y);
-    y += 7;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(30);
+    // Extra gap so large figure ascenders clear the rule above.
+    y += 12;
+    numFont('bold');
+    doc.setFontSize(28);
     setText(INK);
     const leadValue = formatCompact(leadSegment.total);
-    doc.text(leadValue, MARGIN, y);
     const leadW = doc.getTextWidth(leadValue);
-    doc.setFont('helvetica', 'bold');
+    write(leadValue, MARGIN, y);
+    numFont('bold');
     doc.setFontSize(10);
     setText(accent);
-    doc.text(`${formatPercent(leadSegment.share)} of reach`, MARGIN + leadW + 5, y - 1);
-    y += 8;
-    doc.setFont('helvetica', 'bold');
+    write(`${formatPercent(leadSegment.share)} of reach`, MARGIN + leadW + 5, y - 1);
+    y += 9;
+    labelFont('bold');
     doc.setFontSize(11);
     setText(INK);
     const leadName = leadSegment.name;
     const nameLines: string[] = doc.splitTextToSize(leadName, CONTENT_W);
-    doc.text(nameLines, MARGIN, y);
-    y += nameLines.length * 5.2 + 1;
-    doc.setFont('helvetica', 'normal');
+    write(nameLines, MARGIN, y);
+    y += nameLines.length * 5.2 + 2;
+    labelFont('normal');
     doc.setFontSize(8.5);
     setText(FAINT);
-    doc.text(
+    write(
       `Largest single audience${useTradeArea ? ' in the trade area' : ''}. A true headcount, not a sum.`,
       MARGIN,
       y
@@ -423,10 +501,10 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     conc.zipsForHalf
   )} ZIPs make up half the reach`;
   doc.roundedRect(MARGIN, y, CONTENT_W, 9, 2, 2, 'FD');
-  doc.setFont('helvetica', 'normal');
+  labelFont('normal');
   doc.setFontSize(9);
   setText(INK2);
-  doc.text(calloutText, MARGIN + 4, y + 5.8);
+  write(calloutText, MARGIN + 4, y + 5.8);
   y += 16;
 
   // KPI row (2x2)
@@ -476,7 +554,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
       const dia = 30;
       const cx = fx + 6 + dia / 2;
       const cy = y + cardH / 2;
-      drawDonut(cx, cy, dia, 7, buckets, buckets[0]?.label ?? '');
+      drawDonut(cx, cy, dia, 6, buckets, buckets[0]?.label ?? '');
 
       // Legend
       const lx = fx + 6 + dia + 6;
@@ -486,14 +564,14 @@ export function buildMarketReport(input: ReportInput): jsPDF {
       buckets.forEach((b, i) => {
         setFill(bucketColor(i));
         doc.circle(lx + 1.4, ly - 1, 1.4, 'F');
-        doc.setFont('helvetica', 'normal');
+        labelFont('normal');
         doc.setFontSize(8);
         setText(INK2);
         const label = doc.splitTextToSize(b.label, lw - 18)[0] ?? b.label;
-        doc.text(label, lx + 5, ly);
-        doc.setFont('helvetica', 'bold');
+        write(label, lx + 5, ly);
+        numFont('bold');
         setText(INK);
-        doc.text(formatPercent(b.share), fx + fw - 5, ly, { align: 'right' });
+        write(formatPercent(b.share), fx + fw - 5, ly, { align: 'right' });
         ly += rowH;
       });
     });
@@ -526,7 +604,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     }
     doc.rect(MARGIN, y, imgW, imgH, 'S');
     y += imgH + 3;
-    doc.setFont('helvetica', 'normal');
+    labelFont('normal');
     doc.setFontSize(8);
     setText(MUTED);
     const caption = [
@@ -535,7 +613,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     ]
       .filter(Boolean)
       .join('   ·   ');
-    doc.text(caption, MARGIN, y + 2);
+    write(caption, MARGIN, y + 2);
     y += 10;
 
     const colGap = 8;
@@ -556,33 +634,36 @@ export function buildMarketReport(input: ReportInput): jsPDF {
       top
     );
     let ty = top + 6;
+    labelFont('normal');
     doc.setFontSize(7.5);
     setText(FAINT);
-    doc.text(`Total audience ${formatNumber(total)}`, x, ty);
+    write(`Total audience ${formatNumber(total)}`, x, ty);
     ty += 5;
     const max = segments[0]?.total ?? 1;
     const rows = segments.slice(0, TOP_SEGMENT_DISPLAY_COUNT);
+    const barX = x + 5;
+    const barW = w - 5;
     rows.forEach((seg, i) => {
-      doc.setFont('helvetica', 'bold');
+      const rowTop = ty;
+      numFont('bold');
       doc.setFontSize(8);
       setText(MUTED);
-      doc.text(String(i + 1), x, ty);
-      doc.setFont('helvetica', 'normal');
+      write(String(i + 1), x, rowTop);
+      labelFont('normal');
       setText(INK2);
       const name = doc.splitTextToSize(seg.name, w - 34)[0] ?? seg.name;
-      doc.text(name, x + 5, ty);
-      doc.setFont('helvetica', 'bold');
+      write(name, x + 5, rowTop);
+      numFont('bold');
       setText(INK);
-      doc.text(formatNumber(seg.total), x + w, ty, { align: 'right' });
-      ty += 2;
-      bar(x + 5, ty, w - 5, seg.total / max);
-      ty += 6.5;
+      write(formatNumber(seg.total), x + w, rowTop, { align: 'right' });
+      bar(barX, rowTop + 2, barW, seg.total / max);
+      ty = rowTop + 8.5;
     });
     if (segments.length > rows.length) {
-      doc.setFont('helvetica', 'normal');
+      labelFont('normal');
       doc.setFontSize(7.5);
       setText(FAINT);
-      doc.text(`+ ${segments.length - rows.length} more segments`, x + 5, ty + 1);
+      write(`+ ${segments.length - rows.length} more segments`, x + 5, ty + 1);
     }
   }
 
@@ -590,37 +671,38 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     eyebrow(`Top ${TOP_ZIP_DISPLAY_COUNT} ZIP codes · ${scope}`, x, top);
     let ty = top + 6;
     if (zips.length === 0) {
-      doc.setFont('helvetica', 'normal');
+      labelFont('normal');
       doc.setFontSize(8.5);
       setText(MUTED);
-      doc.text('No ZIP data available.', x, ty + 2);
+      write('No ZIP data available.', x, ty + 2);
       return;
     }
+    labelFont('normal');
     doc.setFontSize(7.5);
     setText(FAINT);
-    doc.text(`${Math.min(zips.length, TOP_ZIP_DISPLAY_COUNT)} shown`, x, ty);
+    write(`${Math.min(zips.length, TOP_ZIP_DISPLAY_COUNT)} shown`, x, ty);
     ty += 5;
     const max = zips[0]?.count ?? 1;
     zips.slice(0, TOP_ZIP_DISPLAY_COUNT).forEach((z, i) => {
-      doc.setFont('helvetica', 'bold');
+      const rowTop = ty;
+      numFont('bold');
       doc.setFontSize(8);
       setText(MUTED);
-      doc.text(String(i + 1).padStart(2, '0'), x, ty);
-      doc.setFont('helvetica', 'normal');
+      write(String(i + 1).padStart(2, '0'), x, rowTop);
+      labelFont('normal');
       setText(INK2);
       const zipLabel = formatZipDisplay(z.zip, zipLabels);
       const name = doc.splitTextToSize(zipLabel, w - 42)[0] ?? zipLabel;
-      doc.text(name, x + 8, ty);
-      doc.setFont('helvetica', 'bold');
+      write(name, x + 8, rowTop);
+      numFont('bold');
       setText(INK);
-      doc.text(formatNumber(z.count), x + w - 16, ty, { align: 'right' });
-      doc.setFont('helvetica', 'normal');
+      write(formatNumber(z.count), x + w - 16, rowTop, { align: 'right' });
+      numFont('normal');
       doc.setFontSize(7.5);
       setText(FAINT);
-      doc.text(formatPercent(z.share), x + w, ty, { align: 'right' });
-      ty += 2;
-      bar(x, ty, w, z.count / max);
-      ty += 6.5;
+      write(formatPercent(z.share), x + w, rowTop, { align: 'right' });
+      bar(x, rowTop + 2, w, z.count / max);
+      ty = rowTop + 8.5;
     });
   }
 
