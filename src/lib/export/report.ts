@@ -8,8 +8,7 @@ import {
 } from '@/lib/audience/presentation-limits';
 import type { ReachScopeCopy } from '@/lib/audience/presentation-scope';
 import type { MapImage } from '@/lib/map/export-capture';
-import { formatZipDisplay } from '@/lib/map/zip-labels';
-import type { ZipLabel } from '@/lib/map/zip-labels';
+import { normalizeZipCode, type ZipLabel } from '@/lib/map/zip-labels';
 import { formatCompact, formatNumber, formatPercent, EMPTY_VALUE } from '@/lib/format';
 import {
   registerReportFonts,
@@ -184,17 +183,15 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   const setText = (c: Rgb) => doc.setTextColor(c[0], c[1], c[2]);
   const setStroke = (c: Rgb) => doc.setDrawColor(c[0], c[1], c[2]);
 
-  // Labels use the brand face; pure numerics use Helvetica so lining figures
-  // and stable advances match the on-site CSS `lining-nums` treatment (Questa's
-  // default oldstyle digits break baselines and bar alignment in PDF).
-  const NUM = 'helvetica';
+  // Brand face only (Questa when embedded). Never swap numerics to Helvetica —
+  // alignment is handled with fixed columns / equal digit slots below.
   const labelFont = (style: 'normal' | 'bold' = 'normal') => {
     doc.setCharSpace(0);
     doc.setFont(font, style);
   };
   const numFont = (style: 'normal' | 'bold' = 'bold') => {
     doc.setCharSpace(0);
-    doc.setFont(NUM, style);
+    doc.setFont(font, style);
   };
 
   function write(
@@ -388,7 +385,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     });
     doc.setLineCap('round');
 
-    // Center share — Helvetica lining figures so digits share one baseline.
+    // Center share — brand face (same as the rest of the report).
     numFont('bold');
     doc.setFontSize(12);
     setText(INK);
@@ -683,26 +680,59 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     write(`${Math.min(zips.length, TOP_ZIP_DISPLAY_COUNT)} shown`, x, ty);
     ty += 5;
     const max = zips[0]?.count ?? 1;
+
+    // Same brand face for every cell. Fixed columns + equal-width digit slots so
+    // proportional ZIP glyphs cannot shove "· City" left/right per row.
+    labelFont('bold');
+    doc.setFontSize(8);
+    const digitSlot = Math.max(
+      ...['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'].map(d => doc.getTextWidth(d))
+    );
+    const rankW = digitSlot * 2 + 2.5;
+    const zipW = digitSlot * 5 + 2;
+    const zipX = x + rankW;
+    const cityX = zipX + zipW;
+    const countRight = x + w - 16;
+    const cityMaxW = Math.max(18, countRight - cityX - 4);
+
+    const writeDigits = (text: string, left: number, yPos: number) => {
+      for (let i = 0; i < text.length; i++) {
+        write(text[i]!, left + i * digitSlot, yPos);
+      }
+    };
+
     zips.slice(0, TOP_ZIP_DISPLAY_COUNT).forEach((z, i) => {
       const rowTop = ty;
-      numFont('bold');
+      const zip = normalizeZipCode(z.zip) ?? z.zip;
+      const city = zipLabels[zip]?.city?.trim();
+
+      labelFont('bold');
       doc.setFontSize(8);
       setText(MUTED);
-      write(String(i + 1).padStart(2, '0'), x, rowTop);
-      labelFont('normal');
+      writeDigits(String(i + 1).padStart(2, '0'), x, rowTop);
+
       setText(INK2);
-      const zipLabel = formatZipDisplay(z.zip, zipLabels);
-      const name = doc.splitTextToSize(zipLabel, w - 42)[0] ?? zipLabel;
-      write(name, x + 8, rowTop);
-      numFont('bold');
+      writeDigits(zip, zipX, rowTop);
+
+      if (city) {
+        labelFont('normal');
+        doc.setFontSize(8);
+        setText(INK2);
+        const cityLabel = `· ${city}`;
+        const clipped = doc.splitTextToSize(cityLabel, cityMaxW)[0] ?? cityLabel;
+        write(clipped, cityX, rowTop);
+      }
+
+      labelFont('bold');
+      doc.setFontSize(8);
       setText(INK);
-      write(formatNumber(z.count), x + w - 16, rowTop, { align: 'right' });
-      numFont('normal');
+      write(formatNumber(z.count), countRight, rowTop, { align: 'right' });
+      labelFont('normal');
       doc.setFontSize(7.5);
       setText(FAINT);
       write(formatPercent(z.share), x + w, rowTop, { align: 'right' });
-      bar(x, rowTop + 2, w, z.count / max);
-      ty = rowTop + 8.5;
+      bar(x, rowTop + 3.2, w, z.count / max);
+      ty = rowTop + 9;
     });
   }
 

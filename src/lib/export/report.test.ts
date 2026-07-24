@@ -253,4 +253,31 @@ describe('buildMarketReport', () => {
     expect(raw.includes('within 15 mi')).toBe(true);
     expect(raw.includes(`of ${focusName}`)).toBe(false);
   });
+
+  it('renders the top-ZIP table on page 2 when zip labels are provided', () => {
+    const doc = buildMarketReport({
+      brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
+      agencyBrand: defaultAgencyBrand,
+      fonts,
+      projectName: 'test2',
+      datasetLabel: null,
+      focusName: '777 Nissan',
+      radiusMiles: 10,
+      model,
+      mapImage: { dataUrl: TINY_PNG, width: 1600, height: 1000 },
+      includeComposition: false,
+      zipLabels: {
+        '92335': { zip: '92335', city: 'Fontana', state: 'CA' },
+        '92336': { zip: '92336', city: 'Fontana', state: 'CA' },
+        '91761': { zip: '91761', city: 'Ontario', state: 'CA' },
+      },
+      generatedAt: new Date('2026-07-15T00:00:00Z'),
+    });
+
+    expect(doc.getNumberOfPages()).toBe(2);
+    expect(doc.getFont().fontName).toBe('QuestaSans');
+    if (process.env.WRITE_PDF) {
+      writeFileSync('/tmp/mom-zip-align-check.pdf', Buffer.from(doc.output('arraybuffer')));
+    }
+  });
 });

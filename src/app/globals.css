@@ -1,21 +1,28 @@
 @import "tailwindcss";
 @import "maplibre-gl/dist/maplibre-gl.css";
 
-/* Dealer Media House brand fonts (Questa Sans — Bold = headings, Regular = body).
-   Brittany brief listed two fonts; only this family was supplied, so weights map
-   Font 1 → Bold and Font 2 → Regular. Scoped via [data-agency="dealer-media-house"]. */
+/* Brand UI font — Questa Sans (Bold = headings, Regular = body).
+   Brittany brief listed two fonts; only this family was supplied.
+   IMPORTANT: Tailwind uses 500 (medium) and 600 (semibold). Those MUST map
+   onto the Bold file or the browser silently falls back to system-ui. */
 @font-face {
   font-family: "Questa Sans";
-  src: url("/fonts/questa-sans-regular.otf") format("opentype");
-  font-weight: 400;
+  src:
+    url("/fonts/questa-sans-regular.woff2") format("woff2"),
+    url("/fonts/questa-sans-regular.ttf") format("truetype"),
+    url("/fonts/questa-sans-regular.otf") format("opentype");
+  font-weight: 100 499;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
   font-family: "Questa Sans";
-  src: url("/fonts/questa-sans-bold.otf") format("opentype");
-  font-weight: 700;
+  src:
+    url("/fonts/questa-sans-bold.woff2") format("woff2"),
+    url("/fonts/questa-sans-bold.ttf") format("truetype"),
+    url("/fonts/questa-sans-bold.otf") format("opentype");
+  font-weight: 500 900;
   font-style: normal;
   font-display: swap;
 }
@@ -57,8 +64,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: "Questa Sans", system-ui, sans-serif;
+  --font-mono: "Questa Sans", system-ui, sans-serif;
 }
 
 html {
@@ -68,8 +75,10 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
+  font-family: "Questa Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-variant-numeric: lining-nums tabular-nums;
+  font-feature-settings: "lnum" 1, "tnum" 1;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -79,6 +88,9 @@ body {
    ────────────────────────────────────────────────────────────────────────── */
 .mom-canvas {
   color-scheme: dark;
+  font-family: "Questa Sans", system-ui, sans-serif !important;
+  font-variant-numeric: lining-nums tabular-nums;
+  font-feature-settings: "lnum" 1, "tnum" 1;
 
   --ink: #f4f7fe;
   --ink-2: #c5d0e3;
@@ -262,8 +274,8 @@ body {
    - Accent #ffff00 — warnings / sparse emphasis only
    ────────────────────────────────────────────────────────────────────────── */
 .mom-canvas[data-agency="dealer-media-house"] {
-  --font-heading: "Questa Sans", var(--font-geist-sans), system-ui, sans-serif;
-  --font-body: "Questa Sans", var(--font-geist-sans), system-ui, sans-serif;
+  --font-heading: "Questa Sans", system-ui, sans-serif;
+  --font-body: "Questa Sans", system-ui, sans-serif;
   --brand-highlight: #ffff00;
 
   /* Defaults when no inline OEM/agency brandVars are injected (setup/home).
@@ -899,6 +911,7 @@ body {
   box-shadow: var(--popup-shadow);
   overflow: hidden;
   pointer-events: auto;
+  font-family: "Questa Sans", system-ui, sans-serif;
 }
 
 .mom-zip-hover-dock .mom-popup-inner--zip {
@@ -960,8 +973,7 @@ body {
   background: var(--popup-bg);
   border: 1px solid var(--line);
   box-shadow: var(--popup-shadow);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
+  font-family: "Questa Sans", system-ui, sans-serif;
   overflow: hidden;
   max-height: min(220px, 42vh);
 }

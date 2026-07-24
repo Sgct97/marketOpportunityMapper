@@ -82,7 +82,7 @@ export function audiencePopupHtml(options: {
     ? `padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:${palette.excludedBadgeInk};background:${palette.excludedBadgeBg};border:1px solid ${palette.excludedBadgeBorder};`
     : `padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:${palette.badgeInk};background:${palette.badgeBg};border:1px solid ${palette.badgeBorder};`;
 
-  return `<div class="mom-popup-inner mom-popup-inner--zip" data-theme="${theme}" style="width:240px;max-width:min(240px,78vw);max-height:min(220px,42vh);padding:8px 10px 8px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;">
+  return `<div class="mom-popup-inner mom-popup-inner--zip" data-theme="${theme}" style="width:240px;max-width:min(240px,78vw);max-height:min(220px,42vh);padding:8px 10px 8px;font-family:'Questa Sans',system-ui,sans-serif;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;">
       <span style="font-size:13px;font-weight:700;letter-spacing:0.02em;color:${palette.ink};font-variant-numeric:tabular-nums;" title="${zipTitle}">${zipHeading}</span>
       <span style="${badgeStyle}">${excluded ? 'Excluded' : 'Included'}</span>
