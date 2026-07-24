@@ -56,6 +56,9 @@ interface Props {
   rows: AudienceZipRow[];
   dealerships: DealershipRow[];
   initialSettings: ProjectMapSettings;
+  /** Customer share link: map/dashboard/export only; no project writes. */
+  shareMode?: boolean;
+  shareExpiresAt?: string | null;
 }
 
 function slugify(name: string): string {
@@ -86,6 +89,8 @@ export function PresentationWorkspace({
   rows,
   dealerships,
   initialSettings,
+  shareMode = false,
+  shareExpiresAt = null,
 }: Props) {
   // `parseProjectMapSettings` already fills sensible defaults, so initial state
   // reads from the saved project settings (radius, layer visibility, focus).
@@ -252,9 +257,10 @@ export function PresentationWorkspace({
 
   const persistSettings = useCallback(
     (patch: Partial<ProjectMapSettings>) => {
+      if (shareMode) return;
       void saveProjectMapSettings(projectId, patch);
     },
-    [projectId]
+    [projectId, shareMode]
   );
 
   // Live MapLibre instance, captured for screenshot / PDF export / dashboard preview.
@@ -437,6 +443,16 @@ export function PresentationWorkspace({
   // dashboard charts): luminous glow on dark, true brand hue on light.
   const accentColor = theme === 'light' ? brand.primaryColor : brand.glow;
 
+  const shareExpiresLabel = shareExpiresAt
+    ? `expires ${new Date(shareExpiresAt).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })}`
+    : shareMode
+      ? 'no expiry'
+      : null;
+
   return (
     <div
       className="mom-canvas flex flex-col h-screen"
@@ -455,6 +471,8 @@ export function PresentationWorkspace({
         onToggleTheme={toggleTheme}
         onExportPdf={handleExportPdf}
         onExportPng={handleExportPng}
+        shareMode={shareMode}
+        shareExpiresLabel={shareExpiresLabel}
       />
 
       <div className="flex flex-1 min-h-0">

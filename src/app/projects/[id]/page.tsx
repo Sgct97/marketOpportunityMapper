@@ -1,7 +1,9 @@
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { PageChrome } from '@/components/PageChrome';
 import { getSuggestedClientFromProject } from '@/app/actions/client-dealer';
+import { listPresentationShares } from '@/app/actions/presentation-shares';
 import { renameProject } from '@/app/actions/projects';
 import { AudienceUpload } from '@/components/AudienceUpload';
 import { AudienceDatasetList } from '@/components/AudienceDatasetList';
@@ -9,6 +11,7 @@ import { ClientDealerSetup } from '@/components/ClientDealerSetup';
 import { CompetitorReview } from '@/components/CompetitorReview';
 import { DealershipUpload } from '@/components/DealershipUpload';
 import { DealershipDatasetList } from '@/components/DealershipDatasetList';
+import { ShareLinkPanel } from '@/components/ShareLinkPanel';
 import { loadProjectDealerships } from '@/lib/projects/dealership-data';
 import { parseProjectMapSettings } from '@/lib/projects/settings';
 import { createDataClient } from '@/lib/supabase/data';
@@ -62,6 +65,14 @@ export default async function ProjectPage({ params }: Props) {
   const rename = renameProject.bind(null, id);
   const hasAudience = datasets?.some(d => d.is_active);
   const clientReady = Boolean(clientDealer?.latitude && clientDealer?.longitude);
+
+  const sharesResult = hasAudience ? await listPresentationShares(id) : { shares: [] };
+  const h = await headers();
+  const host = h.get('x-forwarded-host') ?? h.get('host');
+  const proto = h.get('x-forwarded-proto') ?? 'http';
+  const appOrigin = host
+    ? `${proto}://${host}`
+    : (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000');
 
   return (
     <PageChrome
@@ -172,6 +183,14 @@ export default async function ProjectPage({ params }: Props) {
             <span className="text-xs text-[var(--faint)]">Upload required</span>
           )}
         </section>
+
+        {hasAudience && (
+          <ShareLinkPanel
+            projectId={id}
+            initialShares={sharesResult.shares ?? []}
+            appOrigin={appOrigin}
+          />
+        )}
       </main>
     </PageChrome>
   );

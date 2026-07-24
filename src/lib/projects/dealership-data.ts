@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createDataClient } from '@/lib/supabase/data';
 import type { DealershipRow } from '@/lib/dealership/types';
 
@@ -8,9 +9,10 @@ export interface ProjectDealershipPayload {
 }
 
 export async function loadProjectDealerships(
-  projectId: string
+  projectId: string,
+  client?: SupabaseClient
 ): Promise<ProjectDealershipPayload> {
-  const supabase = await createDataClient();
+  const supabase = client ?? (await createDataClient());
 
   const { data: dataset } = await supabase
     .from('dealership_datasets')
