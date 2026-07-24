@@ -86,6 +86,25 @@ async function frameToRadius(
 }
 
 /**
+ * Snapshot the live map canvas as currently framed — no camera moves.
+ * Used for the dashboard hero preview so it matches what the presenter sees.
+ */
+export function captureMapPreview(map: MapLibreMap | null): MapImage | null {
+  if (!map) return null;
+  try {
+    const canvas = map.getCanvas();
+    if (!canvas.width || !canvas.height) return null;
+    return {
+      dataUrl: canvas.toDataURL('image/png'),
+      width: canvas.width,
+      height: canvas.height,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Capture the map for PNG/PDF export. When a focus dealership is set, the
  * viewport is temporarily framed to show the full straight-line radius ring
  * (matching the selected miles in map controls), then restored afterward so

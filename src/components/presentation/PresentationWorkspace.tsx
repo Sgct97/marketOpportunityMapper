@@ -36,7 +36,8 @@ import {
   type RadiusMiles,
 } from '@/lib/projects/settings';
 import { saveProjectMapSettings } from '@/app/actions/project-settings';
-import { captureMapForExport } from '@/lib/map/export-capture';
+import { captureMapForExport, captureMapPreview } from '@/lib/map/export-capture';
+import type { MapImage } from '@/lib/map/export-capture';
 import { MapView } from '@/components/map/MapView';
 import { DashboardView } from '@/components/dashboard/DashboardView';
 import {
@@ -94,6 +95,7 @@ export function PresentationWorkspace({
   const clientOptions = useMemo(() => clientDealerships(dealerships), [dealerships]);
 
   const [view, setView] = useState<PresentationView>('map');
+  const [mapPreview, setMapPreview] = useState<MapImage | null>(null);
   // Default to dark on both server and first client render to avoid a hydration
   // mismatch; the saved preference is applied in an effect after mount.
   const [theme, setTheme] = useState<PresentationTheme>('dark');
@@ -255,13 +257,52 @@ export function PresentationWorkspace({
     [projectId]
   );
 
-  // Live MapLibre instance, captured for screenshot / PDF export.
+  // Live MapLibre instance, captured for screenshot / PDF export / dashboard preview.
   const mapInstanceRef = useRef<MapLibreMap | null>(null);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const viewRef = useRef(view);
+  viewRef.current = view;
 
   const exportFocus = useMemo(() => {
     if (focusDealership?.latitude == null || focusDealership?.longitude == null) return null;
     return { longitude: focusDealership.longitude, latitude: focusDealership.latitude };
   }, [focusDealership]);
+
+  const handleMapReady = useCallback((map: MapLibreMap | null) => {
+    mapInstanceRef.current = map;
+    if (!map) return;
+    // The hero preview mirrors the presenter's map, so re-shoot every time the
+    // map settles — `idle` fires after pan/zoom, layer changes, and tile loads.
+    // The camera is never moved here; that would fight the map's own fitBounds.
+    map.on('idle', () => {
+      if (viewRef.current !== 'map') return;
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = setTimeout(() => {
+        const image = captureMapPreview(mapInstanceRef.current);
+        if (image) setMapPreview(image);
+      }, 250);
+    });
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    },
+    []
+  );
+
+  const handleViewChange = useCallback((next: PresentationView) => {
+    // A hidden map stops rendering, so leaving the Map tab is the last moment we
+    // can match what the presenter just saw. `idle` alone isn't enough: change
+    // the radius and switch immediately and the refit lands after we're hidden.
+    // This is a plain canvas read — synchronous, no camera move, no awaits.
+    if (next !== 'map' && viewRef.current === 'map') {
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+      const image = captureMapPreview(mapInstanceRef.current);
+      if (image) setMapPreview(image);
+    }
+    setView(next);
+  }, []);
 
   const prepareMapForCapture = useCallback(async () => {
     if (view !== 'map') {
@@ -408,7 +449,7 @@ export function PresentationWorkspace({
         projectName={projectName}
         brandName={brand.name}
         view={view}
-        onViewChange={setView}
+        onViewChange={handleViewChange}
         contextLabel={contextLabel}
         theme={theme}
         onToggleTheme={toggleTheme}
@@ -473,9 +514,7 @@ export function PresentationWorkspace({
             }}
             marketAnalysis={marketAnalysis}
             hasFocusDealership={hasFocus}
-            onMapReady={m => {
-              mapInstanceRef.current = m;
-            }}
+            onMapReady={handleMapReady}
           />
         </div>
 
@@ -493,6 +532,8 @@ export function PresentationWorkspace({
               excludedZipCount={excludedZips.length}
               showComposition={showComposition}
               onShowCompositionChange={setShowComposition}
+              mapPreviewUrl={mapPreview?.dataUrl ?? null}
+              onOpenMap={() => setView('map')}
             />
           </div>
         )}

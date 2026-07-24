@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import type { FeatureCollection, Geometry } from 'geojson';
 import { aggregateAudienceByZip } from '@/lib/audience/aggregate';
@@ -16,6 +16,7 @@ import { resolveBasemapStyles, type MapTheme } from '@/lib/map/basemap';
 import { choroplethFillPaint, choroplethLinePaint } from '@/lib/map/choropleth';
 import { hexToRgb } from '@/lib/map/colors';
 import { fetchZipBoundaries } from '@/lib/map/boundaries';
+import { boundsFromRadius } from '@/lib/map/export-capture';
 import {
   CLIENT_DEALERSHIP_HALO_LAYER,
   CLIENT_DEALERSHIP_LAYER,
@@ -236,6 +237,17 @@ export function OpportunityMap({
   const rowsRef = useRef(rows);
 
   const themeRef = useRef(theme);
+  const activeRef = useRef(active);
+  // Last camera seen while the pane was visible. Hiding it collapses the
+  // container to 0x0, and MapLibre re-constrains the camera against that empty
+  // viewport — which is what reset the zoom/center on the way back.
+  const lastCameraRef = useRef<{
+    center: [number, number];
+    zoom: number;
+    bearing: number;
+    pitch: number;
+  } | null>(null);
+  const wasHiddenRef = useRef(false);
 
   useEffect(() => {
     onFocusRef.current = onFocusDealership;
@@ -247,6 +259,12 @@ export function OpportunityMap({
     rowsRef.current = rows;
     themeRef.current = theme;
   }, [onFocusDealership, focusDealershipId, onMapReady, onToggleZipExcluded, excludedZips, zipLabels, rows, theme]);
+
+  // Kept in a layout effect so the flag flips before the browser reports the
+  // collapsed container size, otherwise we'd record the corrupted camera.
+  useLayoutEffect(() => {
+    activeRef.current = active;
+  }, [active]);
 
   const [layersReady, setLayersReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -706,11 +724,50 @@ export function OpportunityMap({
     theme,
   ]);
 
+  // Remember the camera whenever it settles while visible.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !layersReady || !active) return;
+    if (!map || !layersReady) return;
+
+    const remember = () => {
+      if (!activeRef.current) return;
+      const { lng, lat } = map.getCenter();
+      const zoom = map.getZoom();
+      if (!Number.isFinite(lng) || !Number.isFinite(lat) || !Number.isFinite(zoom)) return;
+      lastCameraRef.current = {
+        center: [lng, lat],
+        zoom,
+        bearing: map.getBearing(),
+        pitch: map.getPitch(),
+      };
+    };
+
+    // Only record settled cameras. Seeding this on mount would capture the
+    // constructor's world view and then restore it over the initial radius fit.
+    map.on('moveend', remember);
+    return () => {
+      map.off('moveend', remember);
+    };
+  }, [layersReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !layersReady) return;
+
+    if (!active) {
+      wasHiddenRef.current = true;
+      return;
+    }
+
     // Container had zero size while hidden (dashboard view); recompute on show.
-    const raf = requestAnimationFrame(() => map.resize());
+    // Only restore after an actual hide — on first open there is nothing to
+    // restore and a jumpTo here would clobber the initial radius fit.
+    const raf = requestAnimationFrame(() => {
+      map.resize();
+      const camera = lastCameraRef.current;
+      if (wasHiddenRef.current && camera) map.jumpTo(camera);
+      wasHiddenRef.current = false;
+    });
     return () => cancelAnimationFrame(raf);
   }, [active, layersReady]);
 
@@ -721,12 +778,11 @@ export function OpportunityMap({
     const focus = dealerships.find(d => d.id === focusDealershipId);
     if (!focus || focus.latitude == null || focus.longitude == null) return;
 
-    map.flyTo({
-      center: [focus.longitude, focus.latitude],
-      zoom: Math.max(map.getZoom(), 10),
-      duration: 800,
-    });
-  }, [layersReady, focusDealershipId, dealerships]);
+    // Frame the whole radius ring. A fixed zoom cropped it at larger radii, so
+    // the ring sat off-screen on load. Same bounds the PDF capture uses.
+    const { sw, ne } = boundsFromRadius(focus.longitude, focus.latitude, radiusMiles);
+    map.fitBounds([sw, ne], { padding: 56, duration: 800 });
+  }, [layersReady, focusDealershipId, dealerships, radiusMiles]);
 
   useEffect(() => {
     const map = mapRef.current;

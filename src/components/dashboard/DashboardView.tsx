@@ -29,6 +29,9 @@ interface Props {
   /** When false, hide Audience composition donuts (also omitted from PDF). */
   showComposition: boolean;
   onShowCompositionChange: (show: boolean) => void;
+  /** Live map canvas snapshot — mirrors the Map tab's current pan/zoom. */
+  mapPreviewUrl?: string | null;
+  onOpenMap?: () => void;
 }
 
 function CompositionSwitch({
@@ -68,6 +71,8 @@ export function DashboardView({
   excludedZipCount,
   showComposition,
   onShowCompositionChange,
+  mapPreviewUrl = null,
+  onOpenMap,
 }: Props) {
   const {
     totalAudience,
@@ -118,15 +123,19 @@ export function DashboardView({
           </section>
         ) : (
         <>
-        {/* Hero */}
-        <section className="mom-card mom-card-lg mom-fade-up relative overflow-hidden p-7 sm:p-9">
+        {/* Hero — copy left; live map snapshot (current pan/zoom) on the right. */}
+        <section className="mom-card mom-card-lg mom-fade-up relative overflow-hidden">
+          {!mapPreviewUrl && (
+            <div
+              className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full blur-3xl"
+              style={{ background: 'var(--accent-soft)' }}
+              aria-hidden
+            />
+          )}
           <div
-            className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full blur-3xl"
-            style={{ background: 'var(--accent-soft)' }}
-            aria-hidden
-          />
-          <div className="relative">
-            <div className="max-w-2xl">
+            className={`relative grid ${mapPreviewUrl ? 'lg:grid-cols-2' : ''}`}
+          >
+            <div className="p-7 sm:p-9 min-w-0">
               <div className="flex items-center gap-2.5">
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--accent)', boxShadow: '0 0 10px var(--accent)' }} />
                 <p className="mom-eyebrow">Market opportunity · {subjectName}</p>
@@ -172,6 +181,35 @@ export function DashboardView({
                 concentrated in the top 5 ZIPs · {formatNumber(conc.zipsForHalf)} ZIPs make up half the reach.
               </p>
             </div>
+
+            {mapPreviewUrl && (
+              <button
+                type="button"
+                onClick={onOpenMap}
+                className="relative min-h-[220px] lg:min-h-0 border-t lg:border-t-0 lg:border-l border-[var(--line-soft)] text-left group cursor-pointer"
+                style={{ background: 'var(--map-backdrop)' }}
+                aria-label="Open map view"
+              >
+                {/* `contain`, not `cover`: cover scales the snapshot up and
+                    crops it, which reads as a different zoom than the map. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={mapPreviewUrl}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-contain"
+                />
+                <span
+                  className="absolute bottom-3 right-3 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold tracking-wide uppercase opacity-90 transition-opacity group-hover:opacity-100"
+                  style={{
+                    background: 'var(--chip-bg)',
+                    color: 'var(--ink)',
+                    border: '1px solid var(--line)',
+                  }}
+                >
+                  Open map
+                </span>
+              </button>
+            )}
           </div>
         </section>
 
