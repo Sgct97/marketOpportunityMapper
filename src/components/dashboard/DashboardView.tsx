@@ -7,10 +7,8 @@ import { formatCompact, formatNumber, formatPercent, EMPTY_VALUE } from '@/lib/f
 import {
   BarRow,
   Donut,
-  IconFlag,
   IconLayers,
   IconTarget,
-  IconUsers,
   KpiCard,
   SectionCard,
 } from './primitives';
@@ -214,22 +212,14 @@ export function DashboardView({
         </section>
 
         {/* KPI row */}
-        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
-          <KpiCard
-            label="Largest single audience"
-            value={leadSegment ? formatCompact(leadSegment.total) : EMPTY_VALUE}
-            accent={leadSegment ? formatPercent(leadSegment.share) : null}
-            icon={<IconUsers />}
-            sub={leadSegment?.name ?? 'No segments in file'}
-            delay={40}
-          />
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
           {useTradeArea ? (
             <KpiCard
               label="ZIPs in trade area"
               value={formatNumber(heroZips)}
               icon={<IconTarget />}
               sub={`within ${radiusMiles} mi of ${subjectName}`}
-              delay={100}
+              delay={40}
             />
           ) : (
             <KpiCard
@@ -237,7 +227,7 @@ export function DashboardView({
               value={topSegment ? formatPercent(topSegment.share) : EMPTY_VALUE}
               icon={<IconTarget />}
               sub={topSegment?.name ?? 'No segments'}
-              delay={100}
+              delay={40}
             />
           )}
           <KpiCard
@@ -245,14 +235,7 @@ export function DashboardView({
             value={formatPercent(conc.top5Share)}
             icon={<IconLayers />}
             sub={`from the top 5 ZIPs · ${formatNumber(conc.zipsForHalf)} ZIPs make up half`}
-            delay={160}
-          />
-          <KpiCard
-            label="Segments in file"
-            value={formatNumber(segmentCount)}
-            icon={<IconFlag />}
-            sub="distinct audience segments"
-            delay={220}
+            delay={100}
           />
         </div>
 

@@ -102,9 +102,9 @@ export function estimatePage1HeightWithoutComposition(
     const nameLines = probe.splitTextToSize(leadSegmentName, CONTENT_W);
     y += nameLines.length * 5.2 + 2 + 8;
   }
-  // Concentration callout + 2x2 KPI grid
+  // Concentration callout + single KPI row (2 cards)
   y += 16;
-  y += 28 + 4 + 28 + 12;
+  y += 28 + 12;
   // Footer band under last content
   return Math.min(PAGE_H, Math.max(y + 20, HEADER_H + 90));
 }
@@ -504,20 +504,13 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   write(calloutText, MARGIN + 4, y + 5.8);
   y += 16;
 
-  // KPI row (2x2)
+  // KPI row — ZIPs + concentration side by side
   const gap = 4;
   const kw = (CONTENT_W - gap) / 2;
   const kh = 28;
-  kpiCard(
-    MARGIN, y, kw, kh,
-    'Largest single audience',
-    leadSegment ? formatCompact(leadSegment.total) : EMPTY_VALUE,
-    leadSegment?.name ?? 'No segments in file',
-    leadSegment ? formatPercent(leadSegment.share) : undefined
-  );
   if (useTradeArea) {
     kpiCard(
-      MARGIN + kw + gap,
+      MARGIN,
       y,
       kw,
       kh,
@@ -526,11 +519,25 @@ export function buildMarketReport(input: ReportInput): jsPDF {
       `within ${radiusMiles} mi`
     );
   } else {
-    kpiCard(MARGIN + kw + gap, y, kw, kh, 'Lead segment share', model.topSegment ? formatPercent(model.topSegment.share) : EMPTY_VALUE, model.topSegment?.name ?? 'No segments');
+    kpiCard(
+      MARGIN,
+      y,
+      kw,
+      kh,
+      'Lead segment share',
+      model.topSegment ? formatPercent(model.topSegment.share) : EMPTY_VALUE,
+      model.topSegment?.name ?? 'No segments'
+    );
   }
-  y += kh + gap;
-  kpiCard(MARGIN, y, kw, kh, 'Market concentration', formatPercent(conc.top5Share), `from the top 5 ZIPs · ${formatNumber(conc.zipsForHalf)} ZIPs make up half`);
-  kpiCard(MARGIN + kw + gap, y, kw, kh, 'Segments in file', formatNumber(model.segmentCount), 'distinct audience segments');
+  kpiCard(
+    MARGIN + kw + gap,
+    y,
+    kw,
+    kh,
+    'Market concentration',
+    formatPercent(conc.top5Share),
+    `from the top 5 ZIPs · ${formatNumber(conc.zipsForHalf)} ZIPs make up half`
+  );
   y += kh + 12;
 
   // Audience composition (up to 2 facets) — donut + legend, like the dashboard.
