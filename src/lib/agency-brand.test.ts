@@ -13,6 +13,9 @@ describe('getAgencyBrand', () => {
     expect(dmh.glow.toLowerCase()).toBe('#00afaf');
     expect(dmh.secondaryColor.toLowerCase()).toBe('#00afaf');
     expect(dmh.textColor.toLowerCase()).toBe('#21231f');
+    expect(dmh.headerBackgroundColor?.toLowerCase()).toBe('#003c46');
+    expect(dmh.headerAccentColor?.toLowerCase()).toBe('#00afaf');
+    expect(dmh.logo).toBe('/dmh-logo-light.png');
     expect(dmh.highlightColor?.toLowerCase()).toBe('#ffff00');
     expect(dmh.tertiaryColor?.toLowerCase()).toBe('#21231f');
   });

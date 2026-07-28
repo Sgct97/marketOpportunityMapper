@@ -16,7 +16,10 @@ export interface AgencyBrandConfig {
   glow: string;
   secondaryColor: string;
   textColor: string;
+  /** Full-bleed PDF letterhead background (dark brand bar). */
   headerBackgroundColor?: string;
+  /** Accent rule under the PDF letterhead (e.g. DMH cyan). */
+  headerAccentColor?: string;
   /** Optional brand highlight (e.g. DMH yellow) — sparingly for emphasis. */
   highlightColor?: string;
   /** Optional deep tertiary (e.g. DMH charcoal). */
@@ -27,7 +30,8 @@ export const agencyBrands: Record<string, AgencyBrandConfig> = {
   'dealer-media-house': {
     id: 'dealer-media-house',
     name: 'Dealer Media House',
-    logo: '/logo.png',
+    // White mark for dark PDF letterhead (matches CTV report chrome).
+    logo: '/dmh-logo-light.png',
     logoAspect: 746 / 208,
     logoFormat: 'PNG',
     // Brittany brand system (apply everywhere when this agency is selected).
@@ -35,6 +39,8 @@ export const agencyBrands: Record<string, AgencyBrandConfig> = {
     glow: '#00afaf',
     secondaryColor: '#00afaf',
     textColor: '#21231f',
+    headerBackgroundColor: '#003c46',
+    headerAccentColor: '#00afaf',
     /** Yellow highlight — use sparingly (alerts / emphasis), never as the main accent. */
     highlightColor: '#ffff00',
     tertiaryColor: '#21231f',
@@ -50,6 +56,7 @@ export const agencyBrands: Record<string, AgencyBrandConfig> = {
     secondaryColor: '#1D3F8F',
     textColor: '#1A202C',
     headerBackgroundColor: '#101827',
+    headerAccentColor: '#C91F2C',
   },
 };
 
