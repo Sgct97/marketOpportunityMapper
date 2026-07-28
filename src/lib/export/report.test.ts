@@ -17,6 +17,14 @@ function pdfPageHeightsMm(data: ArrayBuffer): number[] {
   });
 }
 
+function pdfPageWidthsMm(data: ArrayBuffer): number[] {
+  const raw = Buffer.from(data).toString('latin1');
+  return [...raw.matchAll(/\/MediaBox\s*\[\s*([^\]]+)\]/g)].map(m => {
+    const nums = m[1].trim().split(/\s+/).map(Number);
+    return ((nums[2] - nums[0]) * 25.4) / 72;
+  });
+}
+
 // A 1x1 transparent PNG — stands in for the captured map canvas in tests.
 const TINY_PNG =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
@@ -180,7 +188,7 @@ describe('buildMarketReport', () => {
     expect(withoutBuf.length).toBeLessThan(withBuf.length);
   });
 
-  it('keeps the map on page 2 at full size and shortens page 1 MediaBox when composition is off', () => {
+  it('puts the map preview on page 1 and audience tables on page 2', () => {
     const withComposition = buildMarketReport({
       brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
       agencyBrand: defaultAgencyBrand,
@@ -213,22 +221,52 @@ describe('buildMarketReport', () => {
 
     const withHeights = pdfPageHeightsMm(withComposition.output('arraybuffer'));
     const withoutHeights = pdfPageHeightsMm(withoutComposition.output('arraybuffer'));
+    const withWidths = pdfPageWidthsMm(withComposition.output('arraybuffer'));
+    const withoutWidths = pdfPageWidthsMm(withoutComposition.output('arraybuffer'));
 
-    // File bytes: page 1 MediaBox is short when donuts are off; page 2 stays A4.
+    // Both pages crop to content (no full-A4 whitespace under the last section).
+    expect(withHeights[0]).toBeLessThan(290);
+    expect(withHeights[1]).toBeLessThan(290);
     expect(withoutHeights[0]).toBeLessThan(260);
-    expect(withoutHeights[0]).toBeGreaterThan(180);
-    expect(withoutHeights[1]).toBeCloseTo(297, 0);
+    expect(withoutHeights[1]).toBeLessThan(290);
 
-    // Composition on → both pages full A4.
-    expect(withHeights[0]).toBeCloseTo(297, 0);
-    expect(withHeights[1]).toBeCloseTo(297, 0);
+    // Width must stay full A4 on every page (height-only crop).
+    expect(withWidths[0]).toBeCloseTo(210, 0);
+    expect(withWidths[1]).toBeCloseTo(210, 0);
+    expect(withoutWidths[0]).toBeCloseTo(210, 0);
+    expect(withoutWidths[1]).toBeCloseTo(210, 0);
 
-    // Height was applied before draw (matches estimator).
     const expected = estimatePage1HeightWithoutComposition(
       model.tradeArea?.leadSegment?.name ?? model.topSegment?.name ?? null,
+      true,
       fonts
     );
     expect(withoutHeights[0]).toBeCloseTo(expected, 0);
+
+    // No map + no composition → short single page.
+    const shortDoc = buildMarketReport({
+      brand: resolveBrandAccent({ clientBrand: 'Hyundai' }),
+      agencyBrand: defaultAgencyBrand,
+      fonts,
+      projectName: 'Fontana Hyundai',
+      datasetLabel: null,
+      focusName: 'CardinaleWay Hyundai - Glendora',
+      radiusMiles: 15,
+      model,
+      mapImage: null,
+      includeComposition: false,
+      generatedAt: new Date('2026-06-16T00:00:00Z'),
+    });
+    const shortHeights = pdfPageHeightsMm(shortDoc.output('arraybuffer'));
+    expect(shortDoc.getNumberOfPages()).toBe(1);
+    expect(shortHeights[0]).toBeCloseTo(
+      estimatePage1HeightWithoutComposition(
+        model.tradeArea?.leadSegment?.name ?? model.topSegment?.name ?? null,
+        false,
+        fonts
+      ),
+      0
+    );
   });
 
   it('does not put the focus dealer name in the trade-area KPI subtext', () => {

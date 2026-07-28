@@ -59,7 +59,10 @@ const PAGE_W = 210;
 const PAGE_H = 297;
 const MARGIN = 16;
 const CONTENT_W = PAGE_W - MARGIN * 2;
-const HEADER_H = 48;
+/** Letterhead height (mm) — dark brand bar + cyan accent, CTV-report style. */
+const HEADER_H = 36;
+const HEADER_ACCENT_H = 2.2;
+const CONTENT_TOP = HEADER_H + 10;
 
 function hexToRgb(hex: string): Rgb {
   const m = hex.replace('#', '');
@@ -81,32 +84,66 @@ function formatDate(d: Date): string {
   return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+const FOOTER_BAND = 18;
+
 /**
- * Page-1 height when composition donuts are omitted.
- * Mirrors the y-advancement in buildMarketReport's page-1 body (hero → KPIs)
- * so we can set MediaBox BEFORE drawing (required for correct PDF coords).
+ * Page-1 MediaBox height (content + footer). Must be applied BEFORE drawing.
  */
-export function estimatePage1HeightWithoutComposition(
+export function estimatePage1Height(
   leadSegmentName: string | null,
+  hasMap: boolean,
+  compositionFacetCount: number,
+  mapAspectRatio?: number | null,
   fonts?: ReportFontFiles | null
 ): number {
   const probe = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
   const font = registerReportFonts(probe, fonts);
-  let y = 58;
-  // Hero block (matches buildMarketReport page-1 spacing)
-  y += 18 + 10 + 6 + 9;
+  let y = CONTENT_TOP + 6;
+
+  const gap = 5;
+  const mapColW = hasMap ? CONTENT_W * 0.48 : 0;
+  const metricsW = hasMap ? CONTENT_W - mapColW - gap : CONTENT_W;
+
+  let metricsH = 11 + 6.5 + 10;
   if (leadSegmentName) {
-    y += 12 + 9;
     probe.setFont(font, 'bold');
     probe.setFontSize(11);
-    const nameLines = probe.splitTextToSize(leadSegmentName, CONTENT_W);
-    y += nameLines.length * 5.2 + 2 + 8;
+    const nameLines = probe.splitTextToSize(leadSegmentName, metricsW);
+    metricsH += 5 + 7 + 8 + nameLines.length * 5 + 3 + 8;
   }
-  // Concentration callout + single KPI row (2 cards)
-  y += 16;
-  y += 28 + 12;
-  // Footer band under last content
-  return Math.min(PAGE_H, Math.max(y + 20, HEADER_H + 90));
+  metricsH += 5 + 9; // bubble
+  const ar = mapAspectRatio && mapAspectRatio > 0 ? mapAspectRatio : 0.75;
+  const mapH = hasMap ? mapColW * ar + 2.4 : 0;
+  y += Math.max(metricsH, mapH) + 4;
+  // KPI row
+  y += 28 + 6;
+  if (compositionFacetCount > 0) {
+    y += 5 + 40 + 5;
+  }
+  return Math.min(PAGE_H, Math.max(y + FOOTER_BAND, HEADER_H + 80));
+}
+
+/** @deprecated Prefer estimatePage1Height — kept for existing callers/tests. */
+export function estimatePage1HeightWithoutComposition(
+  leadSegmentName: string | null,
+  hasMap: boolean,
+  fonts?: ReportFontFiles | null
+): number {
+  return estimatePage1Height(leadSegmentName, hasMap, 0, null, fonts);
+}
+
+/** Page-2 MediaBox height for segment + ZIP tables. Apply before drawing page 2. */
+export function estimatePage2Height(
+  segmentCount: number,
+  zipCount: number
+): number {
+  let y = CONTENT_TOP;
+  const segRows = Math.min(Math.max(segmentCount, 1), TOP_SEGMENT_DISPLAY_COUNT);
+  const zipRows = Math.min(Math.max(zipCount, 1), TOP_ZIP_DISPLAY_COUNT);
+  const segH = 6 + 5 + segRows * 8.5 + (segmentCount > segRows ? 6 : 2);
+  const zipH = 6 + 5 + (zipCount === 0 ? 8 : zipRows * 8.5) + 2;
+  y += Math.max(segH, zipH);
+  return Math.min(PAGE_H, Math.max(y + FOOTER_BAND, HEADER_H + 70));
 }
 
 /**
@@ -140,9 +177,12 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   // caller passes either the vehicle/OEM brand or the agency brand here), while
   // the agency stripe/letterhead always uses the agency primary.
   const accent = hexToRgb(brand.primaryColor);
-  const agencyAccent = hexToRgb(agencyBrand.primaryColor);
   const accentSoft = tint(accent, 0.86);
   const accentLine = tint(accent, 0.62);
+  // Letterhead teal — card borders + map letterbox fill.
+  const chrome = hexToRgb(
+    agencyBrand.headerBackgroundColor ?? agencyBrand.primaryColor
+  );
 
   // Mirror the dashboard's trade-area decision so the report shows exactly what
   // the presenter sees on screen.
@@ -165,18 +205,16 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   const font = registerReportFonts(doc, fonts);
   doc.setFont(font, 'normal');
 
-  // When composition is off, page 1 must be short — but the height MUST be set
-  // BEFORE any drawing. jsPDF bakes y→PDF transforms using the current page
-  // height at draw time; shrinking after drawing leaves a full-A4 layout inside
-  // a short MediaBox (clipped top / wrong gaps). Map stays on page 2 at full A4.
+  // Short MediaBox BEFORE drawing — jsPDF bakes y transforms from page height.
   const facetsForPage1 = includeComposition ? model.composition.slice(0, 2) : [];
-  const omitComposition = facetsForPage1.length === 0;
-  if (omitComposition) {
-    doc.internal.pageSize.height = estimatePage1HeightWithoutComposition(
-      leadSegment?.name ?? null,
-      fonts
-    );
-  }
+  const mapAr = mapImage && mapImage.width > 0 ? mapImage.height / mapImage.width : null;
+  doc.internal.pageSize.height = estimatePage1Height(
+    leadSegment?.name ?? null,
+    Boolean(mapImage),
+    facetsForPage1.length,
+    mapAr,
+    fonts
+  );
 
   // ── helpers bound to this doc ──────────────────────────────────────────
   const setFill = (c: Rgb) => doc.setFillColor(c[0], c[1], c[2]);
@@ -214,81 +252,92 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   }
 
   function drawHeaderBand() {
-    // Enterprise letterhead band: full-bleed accent rule, neutral surface, and a
-    // structured lockup — agency logo (left) · report identity (center) · client
-    // meta panel (right). The OEM accent ties the header to the report body.
-    const bandMid = HEADER_H / 2;
+    // CTV-style letterhead: dark brand bar, cyan accent rule, white lockup —
+    // agency logo (left) · report title (center) · client meta (right).
+    const headerBg = hexToRgb(
+      agencyBrand.headerBackgroundColor ?? agencyBrand.primaryColor
+    );
+    const headerAccent = hexToRgb(
+      agencyBrand.headerAccentColor ?? agencyBrand.glow ?? agencyBrand.secondaryColor
+    );
+    const onHeader: Rgb = WHITE;
+    const onHeaderMuted: Rgb = tint(headerAccent, 0.55);
+    const bandH = HEADER_H - HEADER_ACCENT_H;
+    const bandMid = bandH / 2;
 
-    // Surface + full-bleed accent finish.
-    setFill(tint(agencyAccent, 0.965));
-    doc.rect(0, 0, PAGE_W, HEADER_H, 'F');
-    setFill(agencyAccent);
-    doc.rect(0, 0, PAGE_W, 1.0, 'F');
-    setFill(tint(agencyAccent, 0.55));
-    doc.rect(0, 1.0, PAGE_W, 0.4, 'F');
-    // Bottom border: soft accent band over a crisp hairline.
-    setFill(tint(agencyAccent, 0.72));
-    doc.rect(0, HEADER_H - 0.9, PAGE_W, 0.9, 'F');
-    setStroke(LINE);
-    doc.setLineWidth(0.2);
-    doc.line(0, HEADER_H, PAGE_W, HEADER_H);
+    setFill(headerBg);
+    doc.rect(0, 0, PAGE_W, bandH, 'F');
+    setFill(headerAccent);
+    doc.rect(0, bandH, PAGE_W, HEADER_ACCENT_H, 'F');
 
-    // ── Left: agency logo, vertically centered ──
-    const logoH = 17;
+    // ── Left: agency logo, vertically centered in the dark band ──
+    const logoH = 14;
     const logoY = bandMid - logoH / 2;
     let lockX = MARGIN;
     let logoPlaced = false;
     if (logoDataUrl) {
       const logoW = logoH * agencyBrand.logoAspect;
-      if (agencyBrand.headerBackgroundColor) {
-        const pad = 2.6;
-        setFill(hexToRgb(agencyBrand.headerBackgroundColor));
-        doc.roundedRect(MARGIN - pad, logoY - pad, logoW + pad * 2, logoH + pad * 2, 1.6, 1.6, 'F');
-      }
       try {
         doc.addImage(logoDataUrl, agencyBrand.logoFormat, MARGIN, logoY, logoW, logoH, undefined, 'FAST');
-        lockX = MARGIN + logoW + 8;
+        lockX = MARGIN + logoW + 7;
         logoPlaced = true;
       } catch {
         logoPlaced = false;
       }
     }
     if (!logoPlaced) {
-      labelFont('bold');
-      doc.setFontSize(16);
-      setText(hexToRgb(agencyBrand.textColor));
-      write(agencyBrand.name, MARGIN, bandMid + 2);
-      lockX = MARGIN + doc.getTextWidth(agencyBrand.name) + 9;
+      labelFont('normal');
+      doc.setFontSize(11);
+      setText(onHeader);
+      write(agencyBrand.name.toLowerCase(), MARGIN, bandMid + 1.5);
+      lockX = MARGIN + doc.getTextWidth(agencyBrand.name.toLowerCase()) + 7;
     }
 
-    // ── Vertical divider between letterhead and report identity ──
-    setStroke(LINE);
-    doc.setLineWidth(0.3);
-    doc.line(lockX, logoY + 1, lockX, logoY + logoH - 1);
-    const idX = lockX + 8;
+    // ── Vertical divider ──
+    setStroke(onHeaderMuted);
+    doc.setLineWidth(0.35);
+    doc.line(lockX, logoY + 0.5, lockX, logoY + logoH - 0.5);
+    const idX = lockX + 7;
 
-    // ── Center: report identity lockup (kicker + project) ──
-    const idMaxW = PAGE_W - MARGIN - idX;
-    setFill(accent);
-    doc.circle(idX + 1.1, bandMid - 6.6, 1.15, 'F');
+    // ── Center: report title ──
+    const metaColW = 54;
+    const idMaxW = PAGE_W - MARGIN - metaColW - idX - 4;
     labelFont('bold');
-    doc.setFontSize(11);
-    setText(FAINT);
-    doc.setCharSpace(0.35);
-    doc.text('MARKET OPPORTUNITY REPORT', idX + 4.4, bandMid - 5.5);
-    doc.setCharSpace(0);
-
-    // Auto-fit the project name to one line: shrink before truncating.
-    labelFont('bold');
-    let titleSize = 19;
+    let titleSize = 20;
+    const reportTitle = 'Market Opportunity Report';
     doc.setFontSize(titleSize);
-    while (titleSize > 11 && doc.getTextWidth(projectName) > idMaxW) {
+    while (titleSize > 13 && doc.getTextWidth(reportTitle) > idMaxW) {
       titleSize -= 0.5;
       doc.setFontSize(titleSize);
     }
-    const titleLine = doc.splitTextToSize(projectName, idMaxW)[0] ?? projectName;
-    setText(INK);
-    write(titleLine, idX, bandMid + 6.5);
+    setText(onHeader);
+    write(reportTitle, idX, bandMid + 2.4);
+
+    // ── Right: client / scope meta (right-aligned) ──
+    const metaX = PAGE_W - MARGIN;
+    const metaTop = subjectName || projectName;
+    labelFont('bold');
+    doc.setFontSize(10);
+    setText(onHeader);
+    const metaTitle =
+      doc.splitTextToSize(metaTop, metaColW)[0] ?? metaTop;
+    write(metaTitle, metaX, bandMid - 4.2, { align: 'right' });
+
+    labelFont('normal');
+    doc.setFontSize(8);
+    setText(onHeaderMuted);
+    write(
+      useTradeArea ? `${radiusMiles} mi trade area` : 'Full market',
+      metaX,
+      bandMid + 1.2,
+      { align: 'right' }
+    );
+
+    doc.setFontSize(6.5);
+    const sourceBit = datasetLabel ? `Source: ${datasetLabel}` : 'Source: Audience data';
+    const sourceLine = `${sourceBit} · ${formatDate(generatedAt)}`;
+    const sourceFit = doc.splitTextToSize(sourceLine, metaColW)[0] ?? sourceLine;
+    write(sourceFit, metaX, bandMid + 6.2, { align: 'right' });
   }
 
   function footer(pageLabel: string) {
@@ -306,8 +355,8 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   // KPI card
   function kpiCard(x: number, y: number, w: number, h: number, label: string, value: string, sub: string, badge?: string) {
     setFill(SURFACE);
-    setStroke(LINE);
-    doc.setLineWidth(0.2);
+    setStroke(chrome);
+    doc.setLineWidth(0.45);
     doc.roundedRect(x, y, w, h, 2.5, 2.5, 'FD');
     eyebrow(label, x + 5, y + 7);
     numFont('bold');
@@ -427,82 +476,137 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     });
   }
 
-  // ═══════════════════════ PAGE 1 — Story & metrics ═══════════════════════
+  // ═══════════════════════ PAGE 1 — Dashboard story + map preview ═══════════
   drawHeaderBand();
 
-  let y = 58;
+  // Dashboard-style hero: metrics stack (left) · map preview (right).
+  const heroGap = 5;
+  const mapColW = mapImage ? CONTENT_W * 0.48 : 0;
+  const metricsW = mapImage ? CONTENT_W - mapColW - heroGap : CONTENT_W;
+  const metricsX = MARGIN;
+  const mapX = MARGIN + metricsW + heroGap;
 
-  // Hero — total reach first, then the largest single segment underneath.
-  eyebrow(`Market opportunity · ${subjectName}`, MARGIN, y);
-  y += 18;
+  const reachSizePt = 40;
+  const heroTop = CONTENT_TOP + 6;
+
+  // ── Left: reach → lead audience → concentration bubble (looser type scale) ──
   numFont('bold');
-  doc.setFontSize(40);
+  doc.setFontSize(reachSizePt);
   setText(accent);
-  const reachValue = formatCompact(heroReach);
-  write(reachValue, MARGIN, y);
-  y += 10;
+  write(formatCompact(heroReach), metricsX, heroTop);
+  let metricsY = heroTop + 11;
   labelFont('bold');
-  doc.setFontSize(12.5);
+  doc.setFontSize(13);
   setText(INK);
-  write(scopeCopy.headline, MARGIN, y);
-  y += 6;
+  write(scopeCopy.headline, metricsX, metricsY);
+  metricsY += 6.5;
   labelFont('normal');
-  doc.setFontSize(8.5);
+  doc.setFontSize(9);
   setText(FAINT);
   const reachMeta = `${scopeCopy.segmentPhrase} · ${formatNumber(heroZips)} ZIPs · overlapping${
     useTradeArea ? ` · within ${radiusMiles} mi` : ' · across the market'
   }${excludedZipCount > 0 ? ` · ${formatNumber(excludedZipCount)} ZIP${excludedZipCount === 1 ? '' : 's'} excluded` : ''}`;
-  write(reachMeta, MARGIN, y);
-  y += 9;
+  const reachMetaLines: string[] = doc.splitTextToSize(reachMeta, metricsW);
+  write(reachMetaLines, metricsX, metricsY);
+  const metaLineH = 4.2;
+  const metaBottom = metricsY + (reachMetaLines.length - 1) * metaLineH + 1.2;
 
   if (leadSegment) {
+    // Center the rule between meta text and the top of the lead figure.
+    const leadSizePt = 26;
+    const leadCapMm = leadSizePt * 0.352778 * 0.72;
+    const ruleGap = 3.8;
+    const ruleY = metaBottom + ruleGap;
+    const leadBaseline = ruleY + ruleGap + leadCapMm;
+
     setStroke(LINE);
     doc.setLineWidth(0.2);
-    doc.line(MARGIN, y, MARGIN + CONTENT_W, y);
-    // Extra gap so large figure ascenders clear the rule above.
-    y += 12;
+    doc.line(metricsX, ruleY, metricsX + metricsW, ruleY);
+
+    metricsY = leadBaseline;
     numFont('bold');
-    doc.setFontSize(28);
+    doc.setFontSize(leadSizePt);
     setText(INK);
     const leadValue = formatCompact(leadSegment.total);
     const leadW = doc.getTextWidth(leadValue);
-    write(leadValue, MARGIN, y);
+    write(leadValue, metricsX, metricsY);
     numFont('bold');
     doc.setFontSize(10);
     setText(accent);
-    write(`${formatPercent(leadSegment.share)} of reach`, MARGIN + leadW + 5, y - 1);
-    y += 9;
+    write(`${formatPercent(leadSegment.share)} of reach`, metricsX + leadW + 3.5, metricsY - 0.5);
+    metricsY += 8;
     labelFont('bold');
     doc.setFontSize(11);
     setText(INK);
-    const leadName = leadSegment.name;
-    const nameLines: string[] = doc.splitTextToSize(leadName, CONTENT_W);
-    write(nameLines, MARGIN, y);
-    y += nameLines.length * 5.2 + 2;
+    const nameLines: string[] = doc.splitTextToSize(leadSegment.name, metricsW);
+    write(nameLines, metricsX, metricsY);
+    metricsY += nameLines.length * 5 + 3;
     labelFont('normal');
     doc.setFontSize(8.5);
     setText(FAINT);
-    write(
-      `Largest single audience${useTradeArea ? ' in the trade area' : ''}. A true headcount, not a sum.`,
-      MARGIN,
-      y
-    );
-    y += 8;
+    const caption = `Largest single audience${useTradeArea ? ' in the trade area' : ''}. A true headcount, not a sum.`;
+    const captionLines: string[] = doc.splitTextToSize(caption, metricsW);
+    write(captionLines, metricsX, metricsY);
+    metricsY += captionLines.length * 3.8 + 5;
+  } else {
+    metricsY = metaBottom + 5;
   }
 
-  // Concentration callout
-  setFill(accentSoft);
-  setStroke(accentLine);
-  doc.setLineWidth(0.2);
   const calloutText = `${formatPercent(conc.top5Share)} concentrated in the top 5 ZIPs  ·  ${formatNumber(
     conc.zipsForHalf
   )} ZIPs make up half the reach`;
-  doc.roundedRect(MARGIN, y, CONTENT_W, 9, 2, 2, 'FD');
+  const calloutPadX = 3.5;
+  let calloutSize = 8;
   labelFont('normal');
-  doc.setFontSize(9);
+  doc.setFontSize(calloutSize);
+  while (calloutSize > 6 && doc.getTextWidth(calloutText) > metricsW - calloutPadX * 2) {
+    calloutSize -= 0.25;
+    doc.setFontSize(calloutSize);
+  }
+  const calloutLines: string[] = doc.splitTextToSize(calloutText, metricsW - calloutPadX * 2);
+  const calloutLineH = calloutSize * 0.4;
+  const calloutH = Math.max(8.5, 4 + calloutLines.length * calloutLineH);
+  setFill(accentSoft);
+  setStroke(accentLine);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(metricsX, metricsY, metricsW, calloutH, 2, 2, 'FD');
   setText(INK2);
-  write(calloutText, MARGIN + 4, y + 5.8);
-  y += 16;
+  const calloutTextY =
+    metricsY + (calloutH - calloutLineH * (calloutLines.length - 1)) / 2 + calloutLineH * 0.35;
+  write(calloutLines, metricsX + metricsW / 2, calloutTextY, { align: 'center' });
+  metricsY += calloutH;
+
+  // ── Right: map — equal chrome padding; bottom-aligned with the bubble ──
+  let mapBottom = metricsY;
+  if (mapImage) {
+    const pad = 1.2;
+    const strokeW = 0.3;
+    const ar = mapImage.height / mapImage.width;
+    const imgW = mapColW - pad * 2;
+    const imgH = imgW * ar;
+    const frameH = imgH + pad * 2;
+    // Sit the map on the same baseline as the concentration bubble.
+    const frameY = metricsY - frameH;
+    const imgX = mapX + pad;
+    const imgY = frameY + pad;
+
+    setFill(chrome);
+    setStroke(chrome);
+    doc.setLineWidth(strokeW);
+    doc.roundedRect(mapX, frameY, mapColW, frameH, 2, 2, 'FD');
+    try {
+      doc.addImage(mapImage.dataUrl, 'PNG', imgX, imgY, imgW, imgH, undefined, 'FAST');
+    } catch {
+      setFill(tint(LINE, 0.4));
+      doc.rect(imgX, imgY, imgW, imgH, 'F');
+    }
+    setStroke(chrome);
+    doc.setLineWidth(strokeW);
+    doc.roundedRect(mapX, frameY, mapColW, frameH, 2, 2, 'S');
+    mapBottom = frameY + frameH;
+  }
+
+  let y = Math.max(metricsY, mapBottom) + 4;
 
   // KPI row — ZIPs + concentration side by side
   const gap = 4;
@@ -538,20 +642,20 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     formatPercent(conc.top5Share),
     `from the top 5 ZIPs · ${formatNumber(conc.zipsForHalf)} ZIPs make up half`
   );
-  y += kh + 12;
+  y += kh + 6;
 
   // Audience composition (up to 2 facets) — donut + legend, like the dashboard.
   const facets = facetsForPage1;
   if (facets.length > 0) {
     eyebrow('Audience composition · grouped from segment names', MARGIN, y);
-    y += 6;
+    y += 5;
     const cardH = 40;
     const fw = (CONTENT_W - gap) / 2;
     facets.forEach((facet, fi) => {
       const fx = MARGIN + fi * (fw + gap);
       setFill(SURFACE);
-      setStroke(LINE);
-      doc.setLineWidth(0.2);
+      setStroke(chrome);
+      doc.setLineWidth(0.45);
       doc.roundedRect(fx, y, fw, cardH, 2.5, 2.5, 'FD');
 
       const buckets = facet.buckets.slice(0, 5);
@@ -579,46 +683,22 @@ export function buildMarketReport(input: ReportInput): jsPDF {
         ly += rowH;
       });
     });
-    y += cardH + 8;
+    y += cardH + 5;
   }
 
-  // Page 1 ends after KPIs / optional composition — map stays on page 2 (full size).
+  // Page 2 exists when we have a map export (breakdown tables live there).
   const totalPages = mapImage ? 2 : 1;
   footer(`Page 1 of ${totalPages}  ·  Generated ${formatDate(generatedAt)}`);
 
-  // ═══════════════════════ PAGE 2 — Map & breakdown (full size) ══════════════════════
+  // ═══════════════════════ PAGE 2 — Audience metrics only ═══════════════════
   if (mapImage) {
+    const page2H = estimatePage2Height(activeSegments.length, topZips.length);
+    // Always add a full-width A4 page, then shorten height only.
+    // addPage([w, h], 'portrait') swaps w/h when h < w — that made page 2 narrow.
     doc.addPage([PAGE_W, PAGE_H], 'portrait');
+    doc.internal.pageSize.height = page2H;
     drawHeaderBand();
-    y = 56;
-
-    // Map snapshot at full report width — aspect-fit, capped height (never squeezed).
-    eyebrow('Market map', MARGIN, y);
-    y += 4;
-    const ar = mapImage.height / mapImage.width;
-    const imgW = CONTENT_W;
-    const imgH = Math.min(110, imgW * ar);
-    setStroke(LINE);
-    doc.setLineWidth(0.3);
-    try {
-      doc.addImage(mapImage.dataUrl, 'PNG', MARGIN, y, imgW, imgH, undefined, 'FAST');
-    } catch {
-      setFill(SURFACE);
-      doc.rect(MARGIN, y, imgW, imgH, 'F');
-    }
-    doc.rect(MARGIN, y, imgW, imgH, 'S');
-    y += imgH + 3;
-    labelFont('normal');
-    doc.setFontSize(8);
-    setText(MUTED);
-    const caption = [
-      useTradeArea ? `${subjectName} · ${radiusMiles}-mi trade area` : 'Full-market view',
-      datasetLabel ? `Source: ${datasetLabel}` : null,
-    ]
-      .filter(Boolean)
-      .join('   ·   ');
-    write(caption, MARGIN, y + 2);
-    y += 10;
+    y = CONTENT_TOP;
 
     const colGap = 8;
     const leftW = CONTENT_W * 0.56;
