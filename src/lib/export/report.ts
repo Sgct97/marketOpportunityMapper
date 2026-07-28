@@ -488,6 +488,10 @@ export function buildMarketReport(input: ReportInput): jsPDF {
 
   const reachSizePt = 40;
   const heroTop = CONTENT_TOP + 6;
+  // Cap height of the reach figure — used to line the map's top border up
+  // with the top of the digits (not the text baseline).
+  const reachCapMm = reachSizePt * 0.352778 * 0.74;
+  const reachGlyphTop = heroTop - reachCapMm;
 
   // ── Left: reach → lead audience → concentration bubble (looser type scale) ──
   numFont('bold');
@@ -576,7 +580,7 @@ export function buildMarketReport(input: ReportInput): jsPDF {
   write(calloutLines, metricsX + metricsW / 2, calloutTextY, { align: 'center' });
   metricsY += calloutH;
 
-  // ── Right: map — equal chrome padding; bottom-aligned with the bubble ──
+  // ── Right: map — equal chrome padding; top aligned with reach figure ──
   let mapBottom = metricsY;
   if (mapImage) {
     const pad = 1.2;
@@ -585,8 +589,8 @@ export function buildMarketReport(input: ReportInput): jsPDF {
     const imgW = mapColW - pad * 2;
     const imgH = imgW * ar;
     const frameH = imgH + pad * 2;
-    // Sit the map on the same baseline as the concentration bubble.
-    const frameY = metricsY - frameH;
+    // Outer top of the stroked frame sits on the digit tops.
+    const frameY = reachGlyphTop + strokeW / 2;
     const imgX = mapX + pad;
     const imgY = frameY + pad;
 
