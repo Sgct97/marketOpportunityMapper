@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { canonicalizeOemBrand } from '@/lib/brands';
 import { dedupeCompetitors } from '@/lib/geocode/dedupe';
+import { resolveCompetitorSaveBrand } from '@/lib/geocode/filter-competitor-brand';
 import { searchCompetitorDealers } from '@/lib/geocode/google-places';
 import type { CompetitorCandidate } from '@/lib/geocode/types';
 import { isDuplicateOfClient } from '@/lib/dealership/filter';
@@ -94,22 +95,29 @@ export async function saveCompetitorSelection(
     const normalizedBrand = canonicalizeOemBrand(brand.trim()) ?? brand.trim();
     if (!normalizedBrand) return { error: 'Brand is required.' };
 
-    const filtered = selected.filter(
-      c =>
-        !isDuplicateOfClient(
-          {
-            id: c.placeId,
-            name: c.name,
-            brand: normalizedBrand,
-            role: 'competitor',
-            latitude: c.latitude,
-            longitude: c.longitude,
-            address: c.address,
-            geocode_status: 'ok',
-          },
-          clientRow
-        )
-    );
+    const filtered = selected
+      .map(c => {
+        const saveBrand = resolveCompetitorSaveBrand(c.name, brand);
+        if (!saveBrand) return null;
+        return { candidate: c, saveBrand };
+      })
+      .filter((row): row is { candidate: CompetitorCandidate; saveBrand: string } => row != null)
+      .filter(
+        ({ candidate: c, saveBrand }) =>
+          !isDuplicateOfClient(
+            {
+              id: c.placeId,
+              name: c.name,
+              brand: saveBrand,
+              role: 'competitor',
+              latitude: c.latitude,
+              longitude: c.longitude,
+              address: c.address,
+              geocode_status: 'ok',
+            },
+            clientRow
+          )
+      );
 
     // Replace competitors for this brand only; keep other brands already on the map.
     await supabase
@@ -121,10 +129,10 @@ export async function saveCompetitorSelection(
       .ilike('brand', normalizedBrand);
 
     if (filtered.length > 0) {
-      const rows = filtered.map(c => ({
+      const rows = filtered.map(({ candidate: c, saveBrand }) => ({
         dataset_id: datasetId,
         name: c.name,
-        brand: normalizedBrand,
+        brand: saveBrand,
         role: 'competitor' as const,
         latitude: c.latitude,
         longitude: c.longitude,
