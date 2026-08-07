@@ -1,4 +1,5 @@
 import { websiteDomain } from '@/lib/dealership/infer-client';
+import { filterPlacesMatchingSearchBrand } from '@/lib/geocode/filter-competitor-brand';
 import type { CompetitorCandidate, GeocodedPlace } from './types';
 import { distanceMiles } from '@/lib/map/radius';
 
@@ -133,7 +134,7 @@ export async function searchCompetitorDealers(options: {
 
   const exclude = new Set(options.excludePlaceIds ?? []);
 
-  return places
+  return filterPlacesMatchingSearchBrand(places, options.brand)
     .filter(p => !exclude.has(p.placeId))
     .map(p => ({
       ...p,
