@@ -12,7 +12,11 @@ import type { LatLng } from '@/lib/map/centroids';
 import type { DealershipRow } from '@/lib/dealership/types';
 import { rankedCompetitorsForProject } from '@/lib/dealership/rank-competitors';
 import type { RadiusMiles } from '@/lib/projects/settings';
-import { resolveBasemapStyles, type MapTheme } from '@/lib/map/basemap';
+import {
+  cartoTransformRequest,
+  resolveBasemapStyles,
+  type MapTheme,
+} from '@/lib/map/basemap';
 import { choroplethFillPaint, choroplethLinePaint } from '@/lib/map/choropleth';
 import { hexToRgb } from '@/lib/map/colors';
 import { fetchZipBoundaries } from '@/lib/map/boundaries';
@@ -623,6 +627,8 @@ export function OpportunityMap({
         fadeDuration: 0,
         // Required so the WebGL canvas can be read back for screenshot / PDF export.
         canvasContextAttributes: { preserveDrawingBuffer: true },
+        // Stamp Carto `?key=` on style, tile, glyph, and sprite requests.
+        transformRequest: cartoTransformRequest,
       });
 
       map.addControl(
